@@ -1,0 +1,6 @@
+argparse
+numpy
+scipy
+scikit-learn
+pandas
+nose
