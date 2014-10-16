@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import numpy as np
 from sklearn.base import copy
-from sklearn.utils import check_X_y
-from sklearn.utils import _check_partial_fit_first_call
 from sklearn.naive_bayes import BaseNB
 from sklearn.naive_bayes import BaseDiscreteNB, GaussianNB
 from sklearn.naive_bayes import MultinomialNB, BernoulliNB
@@ -24,7 +23,7 @@ class SparkBaseNB(BaseNB):
         C : RDD with arrays, shape = [n_samples]
             Predicted target values for X
         """
-        return X.map(
+        return X0.map(
             lambda X: super(SparkBaseNB, self).predict(X))
 
     def predict_proba(self, X):
@@ -112,7 +111,7 @@ class SparkGaussianNB(GaussianNB, SparkBaseNB):
         """
         # classes = np.unique(Z.column(1).reduce(np.add))
         models = Z.map(
-            lambda (X, y): self.partial_fit(X, y, classes, _refit=True))
+            lambda (X, y): self.partial_fit(X, y, classes))
         avg = models.sum()
         self.__dict__.update(avg.__dict__)
         return self
