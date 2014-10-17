@@ -5,15 +5,19 @@ from sklearn.cluster import KMeans
 
 class SparkKMeans(KMeans):
 
-    # TODO: docs, decide which fit method is faster
-    def fit(self, X, y=None):
+    def fit(self, X, mode='clus', y=None):
+        if mode == 'avg':
+            return self._fit_avg(X, y)
+        return self._fit_clus(X, y)
+
+    def _fit_clus(self, X, y=None):
         models = X.map(
             lambda X: super(SparkKMeans, self).fit(X))
         models = models.map(lambda x: x.cluster_centers_).collect()
         C = np.concatenate(tuple(model for model in models))
         return super(SparkKMeans, self).fit(C)
 
-    def fit2(self, X, y=None):
+    def _fit_avg(self, X, y=None):
         models = X.map(
             lambda X: super(SparkKMeans, self).fit(X))
         model_centers = models.map(lambda x: x.cluster_centers_).collect()
