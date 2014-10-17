@@ -23,7 +23,7 @@ class SparkBaseNB(BaseNB):
         C : RDD with arrays, shape = [n_samples]
             Predicted target values for X
         """
-        return X0.map(
+        return X.map(
             lambda X: super(SparkBaseNB, self).predict(X))
 
     def predict_proba(self, X):
