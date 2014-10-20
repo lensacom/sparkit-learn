@@ -7,11 +7,11 @@ from nose.tools import assert_equal
 from nose.tools import assert_true
 from numpy.testing import assert_array_almost_equal
 
-from common import SpylearnTestCase
+from common import SplearnTestCase
 from splearn.rdd import block
 
 
-class RDDTestCase(SpylearnTestCase):
+class RDDTestCase(SplearnTestCase):
 
     def setUp(self):
         super(RDDTestCase, self).setUp()

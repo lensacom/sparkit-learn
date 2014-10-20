@@ -4,7 +4,7 @@ from pyspark import SparkContext
 from pyspark.conf import SparkConf
 
 
-class SpylearnTestCase(unittest.TestCase):
+class SplearnTestCase(unittest.TestCase):
 
     def setUp(self):
         logger = logging.getLogger("py4j.java_gateway")
