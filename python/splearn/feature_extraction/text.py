@@ -41,6 +41,8 @@ class SparkTfidfTransformer(TfidfTransformer):
         if self.use_idf:
             if isinstance(Z, TupleRDD):
                 X = Z.column(0)
+            else:
+                X = Z
 
             n_samples, n_features = X.shape
             df = X.map(mapper).sum()
