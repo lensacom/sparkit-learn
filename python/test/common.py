@@ -13,7 +13,7 @@ class SplearnTestCase(unittest.TestCase):
 
         class_name = self.__class__.__name__
         conf = SparkConf().setAppName(class_name) \
-                          .setMaster('local') \
+                          .setMaster('local[4]') \
                           .set('spark.executor.memory', '512m')
         self.sc = SparkContext(conf=conf)
 
