@@ -118,8 +118,8 @@ class SparkGaussianNB(GaussianNB, SparkBaseNB):
 
     def __add__(self, other):
         this = copy.deepcopy(self)
-        this_class2idx = dict((cls, idx) for idx, cls in enumerate(this.classes_))
-        other_class2idx = dict((cls, idx) for idx, cls in enumerate(other.classes_))
+        this_class2idx = {cls: idx for idx, cls in enumerate(this.classes_)}
+        other_class2idx = {cls: idx for idx, cls in enumerate(other.classes_)}
         for class_i in this.classes_:
             i = this_class2idx[class_i]
             j = other_class2idx[class_i]

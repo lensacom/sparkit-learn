@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from ..rdd import ArrayRDD, TupleRDD
+from ..rdd import ArrayRDD, MatrixRDD, TupleRDD
 
 import numpy as np
 import scipy.sparse as sp
@@ -15,16 +15,17 @@ class SparkHashingVectorizer(HashingVectorizer):
     def fit(self, Z):
         mapper = super(SparkHashingVectorizer, self).fit
         if isinstance(Z, TupleRDD):
-            return Z.map(lambda (X, y): (mapper(X), y))
+            # ensure return type
+            return MatrixRDD(Z.map(lambda (X, y): (mapper(X), y)))
         else:  # omit y
-            return Z.map(lambda X: mapper(X))
+            return MatrixRDD(Z.map(lambda X: mapper(X)))
 
     def transform(self, Z):
         mapper = super(SparkHashingVectorizer, self).transform
         if isinstance(Z, TupleRDD):
-            return Z.map(lambda (X, y): (mapper(X), y))
+            return MatrixRDD(Z.map(lambda (X, y): (mapper(X), y)))
         else:  # else omit y
-            return Z.map(mapper)
+            return MatrixRDD(Z.map(mapper))
 
     fit_transform = transform
 

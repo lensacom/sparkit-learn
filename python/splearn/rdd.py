@@ -84,10 +84,19 @@ def block(rdd, block_size=None):
 class ArrayRDD(object):
 
     def __init__(self, rdd, block_size=None):
-        if block_size is not False:
-            rdd = rdd.mapPartitions(
-                lambda x: _block_collection(x, np.array, block_size))
-        self._rdd = rdd
+        if isinstance(rdd, ArrayRDD):
+            self._rdd = rdd._rdd
+        elif isinstance(rdd, RDD):
+            if block_size is False:
+                self._rdd = rdd
+            else:
+                self._rdd = self._block(rdd, block_size)
+        else:
+            pass  # raise exception
+
+    def _block(self, rdd, block_size):
+        return rdd.mapPartitions(
+            lambda x: _block_collection(x, np.array, block_size))
 
     def __getattr__(self, attr):
         def bypass(*args, **kwargs):
@@ -119,29 +128,23 @@ class ArrayRDD(object):
 
 class MatrixRDD(ArrayRDD):
 
-    def __init__(self, rdd, block_size=None):
-        if block_size is not False:
-            rdd = rdd.mapPartitions(
-                lambda x: _block_collection(x, sp.vstack, block_size))
-        self._rdd = rdd
+    def _block(self, rdd, block_size):
+        return rdd.mapPartitions(
+            lambda x: _block_collection(x, sp.vstack, block_size))
 
 
 class DataFrameRDD(ArrayRDD):
 
-    def __init__(self, rdd, block_size=None):
-        if block_size is not False:
-            rdd = rdd.mapPartitions(
-                lambda x: _block_collection(x, pd.DataFrame, block_size))
-        self._rdd = rdd
+    def _block(self, rdd, block_size):
+        return rdd.mapPartitions(
+            lambda x: _block_collection(x, pd.DataFrame, block_size))
 
 
 class TupleRDD(ArrayRDD):
 
-    def __init__(self, rdd, block_size=None):
-        if block_size is not False:
-            rdd = rdd.mapPartitions(
-                lambda x: _block_tuple(x, block_size))
-        self._rdd = rdd
+    def _block(self, rdd, block_size):
+        return rdd.mapPartitions(
+            lambda x: _block_tuple(x, block_size))
 
     def column(self, col):
         # check first element
