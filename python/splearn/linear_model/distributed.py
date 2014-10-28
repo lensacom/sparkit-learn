@@ -17,8 +17,11 @@ class DistributedTrainMixin(object):
 
 
     def parallel_train(self, model, data, classes=None, n_iter=10):
-        for i in range(n_iter):
-            models = data.mapPartitions(lambda x: self._dist_train(x, model, classes))
+        for _ in xrange(n_iter):
+            if hasattr(model, "partial_fit"):
+                models = data.mapPartitions(lambda x: self._dist_train(x, model, classes))
+            else:
+                models = data.map(lambda (X, y): (model._fit(X, y, classes=classes), 1))
             model, count = models.reduce(self._model_sum)
             model.coef_ /= count
             model.intercept_ /= count
