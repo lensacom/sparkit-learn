@@ -10,6 +10,9 @@ from sklearn.naive_bayes import MultinomialNB, BernoulliNB
 class SparkBaseNB(BaseNB):
     """Abstract base class for distributed naive Bayes estimators"""
 
+    def __radd__(self, other):
+        return self if other == 0 else self.__add__(other)
+
     def predict(self, X):
         """
         Perform classification on an RDD containing arrays of test vectors X.
@@ -142,10 +145,6 @@ class SparkGaussianNB(GaussianNB, SparkBaseNB):
         this.class_prior_[:] = this.class_count_ / np.sum(this.class_count_)
         return this
 
-    def __radd__(self, other):
-        return self if other == 0 else self.__add__(other)
-
-
 
 class SparkBaseDiscreteNB(BaseDiscreteNB, SparkBaseNB):
     """
@@ -156,7 +155,7 @@ class SparkBaseDiscreteNB(BaseDiscreteNB, SparkBaseNB):
 
     def __add__(self, other):
         """
-        Add method for Multinomila NB models.
+        Add method for DiscreteNB models.
 
         Parameters
         ----------
@@ -175,9 +174,6 @@ class SparkBaseDiscreteNB(BaseDiscreteNB, SparkBaseNB):
         model._update_class_log_prior()
         model._update_feature_log_prob()
         return model
-
-    def __radd__(self, other):
-        return self if other == 0 else self.__add__(other)
 
     def fit(self, Z, classes=None, sample_weight=None):
         """

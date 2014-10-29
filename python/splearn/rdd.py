@@ -151,4 +151,4 @@ class TupleRDD(ArrayRDD):
 
     def column(self, col):
         # check first element
-        return ArrayRDD(self._rdd.map(lambda x: x[col]))
+        return ArrayRDD(self._rdd.map(lambda x: x[col]), False)
