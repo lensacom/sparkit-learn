@@ -125,6 +125,9 @@ class ArrayRDD(object):
         shape = self._rdd.map(lambda x: x.shape[0]).reduce(operator.add)
         return (shape,) + first[1:]
 
+    def tolist(self):
+        return self._rdd.flatMap(lambda x: list(x))
+
 
 class MatrixRDD(ArrayRDD):
 
