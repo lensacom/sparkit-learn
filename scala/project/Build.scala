@@ -25,4 +25,26 @@ object RootBuild extends Build {
       )
     ) ++ ScalastylePlugin.Settings
   )
+
+  lazy val sparkDbscan = RootProject(
+    uri("https://github.com/lesbroot/spark_dbscan.git#4fe5c23c7ec06c9af8822e9ad03d70cf6f7bf73b")
+  )
+
+  lazy val dbscanWrapper = Project(
+    id="dbscan-wrapper",
+    base=file("dbscan-wrapper"),
+    settings = assemblySettings ++ Seq(
+      organization := Organization,
+      name := "dbscan-wrapper",
+      version := Version,
+      scalaVersion := ScalaVersion,
+//      resolvers += "Aliaksei Litouka's repository" at "http://alitouka-public.s3-website-us-east-1.amazonaws.com/",
+      libraryDependencies ++= Seq(
+//	"org.alitouka" % "spark_dbscan_2.10" % "0.0.2",
+	"org.apache.spark" %% "spark-core" % "1.1.0" % "provided",
+	"org.apache.spark" %% "spark-mllib" % "1.1.0" % "provided"
+      )
+    ) ++ ScalastylePlugin.Settings
+  ).dependsOn(sparkDbscan)
+
 }
