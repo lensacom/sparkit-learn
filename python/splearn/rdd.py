@@ -119,6 +119,10 @@ class ArrayRDD(object):
     def partitions(self):
         return self._rdd.getNumPartitions()
 
+    def count(self):
+        return self._rdd.mapPartitions(
+            lambda array: [sum(len(i) for i in array)]).reduce(operator.add)
+
     @property
     def shape(self):
         first = self.first().shape
@@ -127,6 +131,10 @@ class ArrayRDD(object):
 
     def tolist(self):
         return self._rdd.flatMap(lambda x: list(x))
+
+    def toiter(self):
+        javaiter = self._rdd._jrdd.toLocalIterator()
+        return self._rdd._collect_iterator_through_file(javaiter)
 
 
 class MatrixRDD(ArrayRDD):
@@ -152,3 +160,9 @@ class TupleRDD(ArrayRDD):
     def column(self, col):
         # check first element
         return ArrayRDD(self._rdd.map(lambda x: x[col]), False)
+
+    def __len__(self):
+        return self._rdd.mapPartitions(
+            lambda i: [sum(1 for _ in i)]).reduce(operator.add)
+
+
