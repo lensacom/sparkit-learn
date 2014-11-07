@@ -1,5 +1,10 @@
 # encoding: utf-8
 
+import time
+
+from sklearn.utils.validation import _num_samples
+from sklearn.cross_validation import _score
+
 
 def _fit_and_score(estimator, train_Z, test_Z, scorer, verbose,
                    parameters, fit_params, return_train_score=False,

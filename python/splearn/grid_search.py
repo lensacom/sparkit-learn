@@ -1,9 +1,10 @@
 # encoding: utf-8
 
 from sklearn.grid_search import ParameterGrid, GridSearchCV
+from sklearn.cross_validation import KFold
 
 from splearn.rdd import ArrayRDD
-
+from splearn.cross_validation import _fit_and_score
 
 __all__ = ['SparkGridSearchCV']
 
