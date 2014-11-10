@@ -1,5 +1,7 @@
 # encoding: utf-8
 
+from pyspark.rdd import RDD
+
 from sklearn.grid_search import ParameterGrid, GridSearchCV
 from sklearn.cross_validation import KFold
 
@@ -8,11 +10,16 @@ from splearn.cross_validation import _fit_and_score
 
 __all__ = ['SparkGridSearchCV']
 
+
 class SparkParameterGrid(ParameterGrid):
 
-    def __init__(self, spark_blocks=4, *args, **kwargs):
-        super(SparkParameterGrid, self).__init__(*args, **kwargs)
-        self.param_grid = ArrayRDD(sc.parallelize(self.param_grid), spark_blocks)
+    def __init__(self, *args, **kwargs):
+        # assume: ArrayRDD(sc.parallelize(self.param_grid), spark_blocks)
+        #if not isinstance(param_grid, ArrayRDD):
+        #    raise TypeError(
+        #        'Expected {0}, got {1}.'.format(type(ArrayRDD), type(param_grid))
+        #    )
+        self.param_grid = kwargs['param_grid']
 
     def __iter__(self):
         def param_gen(params):
@@ -121,16 +128,11 @@ class SparkGridSearchCV(GridSearchCV):
         return self
 
 
+def _check_param_grid(param_grid):
+    if not isinstance(param_grid, SparkParameterGrid):
+        raise TypeError(
+            'Assumed SparkParameterGrid, got {0}.'.format(type(param_grid))
+        )
+
 if __name__ == '__main__':
-    from pyspark.context import SparkContext
-    import numpy as np
-    import splearn.naive_bayes as sparknb
-    from splearn.rdd import TupleRDD
-    sc = SparkContext()
-    X = np.array([[-1, -1], [-2, -1], [-3, -2], [-1, -2], [1, 1], [2, 1], [3, 2], [1, 2]])
-    y = np.array([1, 1, 1, 1, 2, 2, 2, 2])
-    X_rdd = sc.parallelize(X)
-    y_rdd = sc.parallelize(y)
-    Z = TupleRDD(X_rdd.zip(y_rdd), 4)
-    grid = SparkGridSearchCV(estimator=sparknb.SparkGaussianNB(), param_grid=sc.parallelize({}), verbose=0)
-    result = grid.fit(sc, Z, 2)
+    print "woops."

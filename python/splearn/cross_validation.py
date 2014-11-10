@@ -74,8 +74,8 @@ def _fit_and_score(estimator, train_Z, test_Z, scorer, verbose,
 
     start_time = time.time()
 
-    estimator.fit(Z_train, **fit_params)).collect()
-    test_score = _score(estimator, Z_test, scorer))
+    estimator.fit(Z_train, **fit_params).collect()
+    test_score = _score(estimator, Z_test, scorer)
     if return_train_score:
         train_score = _score(estimator, Z_train, scorer)
 
