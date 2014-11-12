@@ -67,7 +67,7 @@ class DictVectorizer(object):
         sc = rdd.context
         self.api = sc._jvm.PythonDictVectorizerAPI()
         self.api.fit(rdd._jrdd)
-        
+
     def transform(self, rdd):
         sc = rdd.context
         if not self.api:
