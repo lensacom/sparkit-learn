@@ -5,6 +5,43 @@ from pyspark.serializers import FramedSerializer
 from pyspark.rdd import RDD
 from pyspark import SparkContext
 
+from sklearn.feature_extraction.dict_vectorizer import DictVectorizer
+
+from ..rdd import ArrayRDD, TupleRDD
+
+
+class SparkDictVectorizer(DictVectorizer):
+
+    def fit(self, Z):
+        feature_names = list(Z.map(
+            lambda Z: self._fit(Z)).reduce(lambda a, b: a.union(b)))
+
+        feature_names.sort()
+        vocab = dict((f, i) for i, f in enumerate(feature_names))
+
+        self.feature_names_ = feature_names
+        self.vocabulary_ = vocab
+
+        return self
+
+    def _fit(self, X, y=None):
+        feature_names = []
+
+        for x in X:
+            for f, v in iteritems(x):
+                if isinstance(v, basestring):
+                    f = "%s%s%s" % (f, self.separator, v)
+                feature_names.append(f)
+
+        return set(feature_names)
+
+    def transform(self, Z):
+        return Z.flatMap(lambda Z:
+            super(SparkDictVectorizer, self).transform(Z))
+
+    def fit_transform(self, Z):
+        return self.fit(Z).transform(Z)
+
 
 class DoubleVectorSerializer(FramedSerializer):
 
