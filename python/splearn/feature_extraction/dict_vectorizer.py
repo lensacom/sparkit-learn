@@ -28,7 +28,7 @@ class SparkDictVectorizer(DictVectorizer):
         feature_names = []
 
         for x in X:
-            for f, v in iteritems(x):
+            for f, v in x.iteritems():
                 if isinstance(v, basestring):
                     f = "%s%s%s" % (f, self.separator, v)
                 feature_names.append(f)
@@ -41,11 +41,6 @@ class SparkDictVectorizer(DictVectorizer):
 
     def fit_transform(self, Z):
         return self.fit(Z).transform(Z)
-
-
-def iteritems(d, **kw):
-    """Return an iterator over the (key, value) pairs of a dictionary."""
-    return iter(getattr(d, 'iteritems')(**kw))
 
 
 class DoubleVectorSerializer(FramedSerializer):
