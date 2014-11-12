@@ -36,11 +36,16 @@ class SparkDictVectorizer(DictVectorizer):
         return set(feature_names)
 
     def transform(self, Z):
-        return Z.flatMap(lambda Z:
+        return Z.map(lambda Z:
             super(SparkDictVectorizer, self).transform(Z))
 
     def fit_transform(self, Z):
         return self.fit(Z).transform(Z)
+
+
+def iteritems(d, **kw):
+    """Return an iterator over the (key, value) pairs of a dictionary."""
+    return iter(getattr(d, 'iteritems')(**kw))
 
 
 class DoubleVectorSerializer(FramedSerializer):
