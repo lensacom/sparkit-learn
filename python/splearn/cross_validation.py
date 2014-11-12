@@ -63,9 +63,9 @@ def _fit_and_score(estimator, train_Z, test_Z, scorer, verbose,
         print("[CV] %s %s" % (msg, (64 - len(msg)) * '.'))
 
     # Adjust lenght of sample weights
-    n_samples = _num_samples(X)
+    n_samples = len(Z_train)
     fit_params = fit_params if fit_params is not None else {}
-    fit_params = dict([(k, np.asarray(v)[train]
+    fit_params = dict([(k, np.asarray(v)
                        if hasattr(v, '__len__') and len(v) == n_samples else v)
                        for k, v in fit_params.items()])
 
