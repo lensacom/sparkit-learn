@@ -3,7 +3,7 @@
 from pyspark.rdd import RDD
 
 import numpy as np
-import pandas as pd
+# import pandas as pd
 import scipy.sparse as sp
 import operator
 
@@ -33,18 +33,18 @@ def _block_tuple(iterator, block_size=None):
     yield tuple(_pack_accumulated(x) for x in blocked_tuple)
 
 
-def _block_collection(iterator, collection_type, block_size=None):
+def _block_collection(iterator, block_size=None):
     """Pack rdd with a specific collection constructor."""
     i = 0
     accumulated = []
     for a in iterator:
         if block_size is not None and i >= block_size:
-            yield collection_type(accumulated)
+            yield _pack_accumulated(accumulated)
             accumulated = []
             i = 0
         accumulated.append(a)
         i += 1
-    yield collection_type(accumulated)
+    yield _pack_accumulated(accumulated)
 
 
 def block(rdd, block_size=None):
@@ -71,19 +71,21 @@ def block(rdd, block_size=None):
         return rdd
 
     # do different kinds of block depending on the type
-    if isinstance(entry, tuple):
+    if isinstance(entry, dict):
+        return DictRDD(rdd.map(lambda x: x.items()), columns=entry.keys())
+    elif isinstance(entry, tuple):
         return TupleRDD(rdd, block_size)
-    elif isinstance(entry, dict):
-        return DataFrameRDD(rdd, block_size)
-    elif sp.issparse(entry):
-        return MatrixRDD(rdd, block_size)
     else:  # Fallback to array packing
         return ArrayRDD(rdd, block_size)
+
+
+# TODO: cache shape etc.
 
 
 class ArrayRDD(object):
 
     def __init__(self, rdd, block_size=None):
+        self.block_size = block_size
         if isinstance(rdd, ArrayRDD):
             self._rdd = rdd._rdd
         elif isinstance(rdd, RDD):
@@ -95,8 +97,7 @@ class ArrayRDD(object):
             pass  # raise exception
 
     def _block(self, rdd, block_size):
-        return rdd.mapPartitions(
-            lambda x: _block_collection(x, np.array, block_size))
+        return rdd.mapPartitions(lambda x: _block_collection(x, block_size))
 
     def __getattr__(self, attr):
         def bypass(*args, **kwargs):
@@ -116,12 +117,28 @@ class ArrayRDD(object):
     def __repr__(self):
         return "{0} from {1}".format(self.__class__, repr(self._rdd))
 
-    def partitions(self):
+    def __getitem__(self, key):
+        indexed = self._rdd.zipWithIndex()
+        if isinstance(key, int):
+            return indexed.filter(lambda (x, i): i == key).first()[0]
+        elif hasattr(key, "__iter__"):
+            return indexed.filter(lambda (x, i): i in key).map(lambda x: x[0])
+        else:
+            raise KeyError("Unexpected type of key: {0}".format(type(key)))
+
+    def __len__(self):
+        # returns number of elements (not blocks)
+        return self.shape[0]
+
+    @property
+    def partitions(self):  # numpart?
+        # returns number of partitions of rdd
         return self._rdd.getNumPartitions()
 
-    def count(self):
-        return self._rdd.mapPartitions(
-            lambda array: [sum(len(i) for i in array)]).reduce(operator.add)
+    @property
+    def blocks(self):
+        # returns number of blocks
+        return self._rdd.count()
 
     @property
     def shape(self):
@@ -136,33 +153,64 @@ class ArrayRDD(object):
         javaiter = self._rdd._jrdd.toLocalIterator()
         return self._rdd._collect_iterator_through_file(javaiter)
 
-
-class MatrixRDD(ArrayRDD):
-
-    def _block(self, rdd, block_size):
-        return rdd.mapPartitions(
-            lambda x: _block_collection(x, sp.vstack, block_size))
-
-
-class DataFrameRDD(ArrayRDD):
-
-    def _block(self, rdd, block_size):
-        return rdd.mapPartitions(
-            lambda x: _block_collection(x, pd.DataFrame, block_size))
+    def map(self, f, preserves_partitioning=False):
+        return self.__class__(self._rdd.map(f, preserves_partitioning), False)
 
 
 class TupleRDD(ArrayRDD):
 
     def _block(self, rdd, block_size):
-        return rdd.mapPartitions(
-            lambda x: _block_tuple(x, block_size))
-
-    def column(self, col):
-        # check first element
-        return ArrayRDD(self._rdd.map(lambda x: x[col]), False)
+        return rdd.mapPartitions(lambda x: _block_tuple(x, block_size))
 
     def __len__(self):
-        return self._rdd.mapPartitions(
-            lambda i: [sum(1 for _ in i)]).reduce(operator.add)
+        # returns number of elements (not blocks)
+        return self.col(0).shape[0]
+
+    def __getitem__(self, key):
+        if hasattr(key, "__iter__"):
+            rdd = self._rdd.map(lambda x: (x[i] for i in key))
+            return TupleRDD(rdd, False)
+        else:
+            rdd = self._rdd.map(lambda x: x[key])
+            return ArrayRDD(rdd, False)
+
+    @property
+    def shape(self):
+        columns = len(self.first())
+        rows = self.__len__()
+        return (rows, columns)
+
+    @property
+    def ix(self):
+        return ArrayRDD(self)
+
+    def map(self, f, preserves_partitioning=False, column=None):
+        if column is not None:
+            mapper = lambda x: x[:column] + (f(x[column]),) + x[column + 1:]
+        else:
+            mapper = f
+        return super(TupleRDD, self).map(mapper, preserves_partitioning)
 
 
+class DictRDD(TupleRDD):
+
+    def __init__(self, rdd, columns, block_size=None):
+        super(DictRDD, self).__init__(rdd, block_size)
+        if not hasattr(columns, "__iter__"):
+            raise ValueError("Columns parameter must be iterable!")
+        elif not all([isinstance(k, basestring) for k in columns]):
+            raise ValueError("Every column must be a string!")
+        if len(columns) != self.numcol:  # optional?
+            raise ValueError("Number of values doesn't match with columns!")
+        self._cols = columns
+
+    def __getitem__(self, key):
+        if hasattr(key, "__iter__"):
+            indices = [self._cols.index(k) for k in key]
+            return DictRDD(self.col(indices), key)
+        else:
+            return self.col(self._cols.index(key))
+
+    def map(self, f, preserves_partitioning=False, column=None):
+        column = self._cols.index(column)
+        return super(TupleRDD, self).map(f, preserves_partitioning, column)
