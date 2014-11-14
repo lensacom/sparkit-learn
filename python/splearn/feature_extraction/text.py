@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from ..rdd import ArrayRDD, MatrixRDD, TupleRDD
+from ..rdd import DictRDD, ArrayRDD
 
 import numpy as np
 import scipy.sparse as sp
@@ -12,20 +12,15 @@ from sklearn.feature_extraction.text import _document_frequency
 
 class SparkHashingVectorizer(HashingVectorizer):
 
-    def fit(self, Z):
-        mapper = super(SparkHashingVectorizer, self).fit
-        if isinstance(Z, TupleRDD):
-            # ensure return type
-            return MatrixRDD(Z.map(lambda (X, y): (mapper(X), y)))
-        else:  # omit y
-            return MatrixRDD(Z.map(lambda X: mapper(X)))
-
     def transform(self, Z):
         mapper = super(SparkHashingVectorizer, self).transform
-        if isinstance(Z, TupleRDD):
-            return MatrixRDD(Z.map(lambda (X, y): (mapper(X), y)))
-        else:  # else omit y
-            return MatrixRDD(Z.map(mapper))
+        if isinstance(Z, DictRDD):
+            return Z.map(mapper, column='X')
+        elif isinstance(Z, ArrayRDD):
+            return Z.map(mapper)
+        else:
+            raise TypeError(
+                "Expected DictRDD or ArrayRDD, given {0}".format(type(Z)))
 
     fit_transform = transform
 
@@ -40,10 +35,13 @@ class SparkTfidfTransformer(TfidfTransformer):
                 return _document_frequency(X)
 
         if self.use_idf:
-            if isinstance(Z, TupleRDD):
-                X = Z.column(0)
-            else:
+            if isinstance(Z, DictRDD):
+                X = Z['X']
+            elif isinstance(Z, ArrayRDD):
                 X = Z
+            else:
+                raise TypeError(
+                    "Expected DictRDD or ArrayRDD, given {0}".format(type(Z)))
 
             n_samples, n_features = X.shape
             df = X.map(mapper).sum()
@@ -61,7 +59,11 @@ class SparkTfidfTransformer(TfidfTransformer):
 
     def transform(self, Z, copy=True):
         mapper = super(SparkTfidfTransformer, self).transform
-        if isinstance(Z, TupleRDD):
-            return Z.map(lambda (X, y): (mapper(X), y))
-        else:  # else omit y
+        if isinstance(Z, DictRDD):
+            return Z.map(mapper, column='X')
+        elif isinstance(Z, ArrayRDD):
             return Z.map(mapper)
+        else:
+            raise TypeError(
+                "Expected DictRDD or ArrayRDD, given {0}".format(type(Z)))
+
