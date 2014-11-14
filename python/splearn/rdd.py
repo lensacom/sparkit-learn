@@ -119,10 +119,18 @@ class ArrayRDD(object):
 
     def __getitem__(self, key):
         indexed = self._rdd.zipWithIndex()
-        if isinstance(key, int):
-            return indexed.filter(lambda (x, i): i == key).first()[0]
+        if isinstance(key, slice):
+            indices = range(self.count())[key]
+            ascending = key.step > 0
+            return indexed.filter(lambda (x, i): i in indices) \
+                          .sortBy(lambda (x, i): i, ascending) \
+                          .map(lambda (x, i): x)
+        elif isinstance(key, int):
+            return indexed.filter(lambda (x, i): i == key) \
+                          .first()[0]
         elif hasattr(key, "__iter__"):
-            return indexed.filter(lambda (x, i): i in key).map(lambda x: x[0])
+            return indexed.filter(lambda (x, i): i in key) \
+                          .map(lambda (x, i): x)
         else:
             raise KeyError("Unexpected type of key: {0}".format(type(key)))
 
@@ -164,11 +172,11 @@ class TupleRDD(ArrayRDD):
 
     def __len__(self):
         # returns number of elements (not blocks)
-        return self.col(0).shape[0]
+        return self.__getitem__(0).shape[0]
 
     def __getitem__(self, key):
         if hasattr(key, "__iter__"):
-            rdd = self._rdd.map(lambda x: (x[i] for i in key))
+            rdd = self._rdd.map(lambda x: tuple(x[i] for i in key))
             return TupleRDD(rdd, False)
         else:
             rdd = self._rdd.map(lambda x: x[key])
@@ -200,16 +208,16 @@ class DictRDD(TupleRDD):
             raise ValueError("Columns parameter must be iterable!")
         elif not all([isinstance(k, basestring) for k in columns]):
             raise ValueError("Every column must be a string!")
-        if len(columns) != self.numcol:  # optional?
+        if len(columns) != len(self.first()):  # optional?
             raise ValueError("Number of values doesn't match with columns!")
         self._cols = columns
 
     def __getitem__(self, key):
         if hasattr(key, "__iter__"):
             indices = [self._cols.index(k) for k in key]
-            return DictRDD(self.col(indices), key)
+            return DictRDD(super(DictRDD, self).__getitem__(indices), key)
         else:
-            return self.col(self._cols.index(key))
+            return super(DictRDD, self).__getitem__(self._cols.index(key))
 
     def map(self, f, preserves_partitioning=False, column=None):
         column = self._cols.index(column)
