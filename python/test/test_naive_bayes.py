@@ -11,7 +11,7 @@ from sklearn.datasets import make_classification
 from sklearn.naive_bayes import MultinomialNB
 
 from common import SplearnTestCase
-from splearn.rdd import ArrayRDD, TupleRDD
+from splearn.rdd import ArrayRDD, DictRDD
 from splearn.naive_bayes import SparkMultinomialNB
 
 
@@ -36,7 +36,7 @@ class NaiveBayesTestCase(SplearnTestCase):
         X_rdd = self.sc.parallelize(X)
         y_rdd = self.sc.parallelize(y)
 
-        Z = TupleRDD(X_rdd.zip(y_rdd), blocks)
+        Z = DictRDD(X_rdd.zip(y_rdd), columns=('X', 'y'), block_size=blocks)
 
         return X, y, Z
 
@@ -50,6 +50,6 @@ class TestMultinomialNB(NaiveBayesTestCase):
         dist = SparkMultinomialNB()
 
         y_local = local.fit(X, y).predict(X)
-        y_dist = dist.fit(Z, classes=np.unique(y)).predict(Z.column(0))
+        y_dist = dist.fit(Z, classes=np.unique(y)).predict(Z['X'])
 
         assert_array_almost_equal(y_local, np.concatenate(y_dist.collect()))

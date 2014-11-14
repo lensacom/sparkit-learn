@@ -112,8 +112,7 @@ class SparkGaussianNB(GaussianNB, SparkBaseNB):
         self : object
             Returns self.
         """
-        # classes = np.unique(Z.column(1).reduce(np.add))
-        models = Z.map(
+        models = Z[['X', 'y']].map(
             lambda (X, y): self.partial_fit(X, y, classes))
         avg = models.sum()
         self.__dict__.update(avg.__dict__)
@@ -175,7 +174,7 @@ class SparkBaseDiscreteNB(BaseDiscreteNB, SparkBaseNB):
         model._update_feature_log_prob()
         return model
 
-    def fit(self, Z, classes=None, sample_weight=None):
+    def fit(self, Z, classes=None):
         """
         Fit Multinomial Naive Bayes according to (X,y) pair
         which is zipped into TupleRDD Z.
@@ -193,8 +192,12 @@ class SparkBaseDiscreteNB(BaseDiscreteNB, SparkBaseNB):
         self : object
             Returns self.
         """
-        models = Z.map(
-            lambda (X, y): self.partial_fit(X, y, classes, sample_weight))
+        if 'w' in Z:
+            models = Z[['X', 'y', 'w']].map(
+                lambda (X, y, w): self.partial_fit(X, y, classes, w))
+        else:
+            models = Z[['X', 'y']].map(
+                lambda (X, y): self.partial_fit(X, y, classes))
         avg = models.sum()
         self.__dict__.update(avg.__dict__)
         return self

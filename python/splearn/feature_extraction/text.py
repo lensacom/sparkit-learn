@@ -15,9 +15,9 @@ class SparkHashingVectorizer(HashingVectorizer):
     def transform(self, Z):
         mapper = super(SparkHashingVectorizer, self).transform
         if isinstance(Z, DictRDD):
-            return Z.map(mapper, column='X')
+            return Z.transform(mapper, column='X')
         elif isinstance(Z, ArrayRDD):
-            return Z.map(mapper)
+            return Z.transform(mapper)
         else:
             raise TypeError(
                 "Expected DictRDD or ArrayRDD, given {0}".format(type(Z)))
@@ -60,10 +60,9 @@ class SparkTfidfTransformer(TfidfTransformer):
     def transform(self, Z, copy=True):
         mapper = super(SparkTfidfTransformer, self).transform
         if isinstance(Z, DictRDD):
-            return Z.map(mapper, column='X')
+            return Z.transform(mapper, column='X')
         elif isinstance(Z, ArrayRDD):
-            return Z.map(mapper)
+            return Z.transform(mapper)
         else:
             raise TypeError(
                 "Expected DictRDD or ArrayRDD, given {0}".format(type(Z)))
-

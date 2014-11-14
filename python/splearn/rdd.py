@@ -161,7 +161,10 @@ class ArrayRDD(object):
         return self._rdd._collect_iterator_through_file(javaiter)
 
     def map(self, f, preserves_partitioning=False):
-        return self.__class__(self._rdd.map(f, preserves_partitioning), False)
+        return ArrayRDD(self._rdd.map(f, preserves_partitioning), False)
+
+    def transform(self, f):
+        return self.map(f)
 
 
 class TupleRDD(ArrayRDD):
@@ -191,12 +194,12 @@ class TupleRDD(ArrayRDD):
     def ix(self):
         return ArrayRDD(self)
 
-    def map(self, f, preserves_partitioning=False, column=None):
+    def transform(self, f, column=None):
         if column is not None:
             mapper = lambda x: x[:column] + (f(x[column]),) + x[column + 1:]
         else:
             mapper = f
-        return super(TupleRDD, self).map(mapper, preserves_partitioning)
+        return TupleRDD(super(TupleRDD, self).map(mapper), block_size=False)
 
 
 class DictRDD(TupleRDD):
@@ -209,15 +212,26 @@ class DictRDD(TupleRDD):
             raise ValueError("Every column must be a string!")
         if len(columns) != len(self.first()):  # optional?
             raise ValueError("Number of values doesn't match with columns!")
-        self._cols = columns
+        self._cols = tuple(columns)
 
     def __getitem__(self, key):
+        if tuple(key) == self._cols:
+            return self
         if hasattr(key, "__iter__"):
             indices = [self._cols.index(k) for k in key]
             return DictRDD(super(DictRDD, self).__getitem__(indices), key)
         else:
             return super(DictRDD, self).__getitem__(self._cols.index(key))
 
-    def map(self, f, preserves_partitioning=False, column=None):
-        column = self._cols.index(column)
-        return super(TupleRDD, self).map(f, preserves_partitioning, column)
+    def __contains__(self, key):
+        return key in self._cols
+
+    @property
+    def columns(self):
+        return self._cols
+
+    def transform(self, f, column=None):
+        if column is not None:
+            column = self._cols.index(column)
+        transformed = super(DictRDD, self).transform(f, column)
+        return DictRDD(transformed, columns=self._cols)
