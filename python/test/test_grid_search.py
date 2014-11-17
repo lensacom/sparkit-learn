@@ -10,7 +10,7 @@ from sklearn.svm import LinearSVC
 
 from common import SplearnTestCase
 from splearn.rdd import ArrayRDD, DictRDD
-from splearn.grid import SparkGridSearchCV
+from splearn.grid_search import SparkGridSearchCV
 from splearn.naive_bayes import SparkMultinomialNB
 
 from sklearn.cross_validation import KFold
