@@ -1,30 +1,12 @@
-# encoding: utf-8
+# -*- coding: utf-8 -*-
 
 import time
+import logger
+import numbers
+import warnings
 
 from sklearn.utils.validation import _num_samples
-from sklearn.cross_validation import _score
-
-import warnings
-from itertools import chain, combinations
-from math import ceil, floor, factorial
-import numbers
-import time
-from abc import ABCMeta, abstractmethod
-
-import numpy as np
-import scipy.sparse as sp
-
-from sklearn.base import is_classifier, clone
-from sklearn.utils import indexable, check_random_state, safe_indexing
-from sklearn.utils.validation import _num_samples, check_array
-from sklearn.utils.multiclass import type_of_target
-from sklearn.externals.joblib import Parallel, delayed, logger
-from sklearn.externals.six import with_metaclass
-from sklearn.externals.six.moves import zip
-from sklearn.metrics.scorer import check_scoring
-
-from sklearn.cross_validation import KFold, StratifiedKFold, FitFailedWarning
+from sklearn.cross_validation import KFold, FitFailedWarning
 
 
 def _check_cv(cv, Z=None):
@@ -61,12 +43,7 @@ def _fit_and_score(estimator, Z, scorer, train, test, verbose,
                           for k, v in parameters.items()))
         print("[CV] %s %s" % (msg, (64 - len(msg)) * '.'))
 
-    # Adjust lenght of sample weights
-    # n_samples = _num_samples(X)
-    # fit_params = fit_params if fit_params is not None else {}
-    # fit_params = dict([(k, np.asarray(v)[train]
-    #                    if hasattr(v, '__len__') and len(v) == n_samples else v)
-    #                    for k, v in fit_params.items()])
+    fit_params = fit_params if fit_params is not None else {}
 
     if parameters is not None:
         estimator.set_params(**parameters)

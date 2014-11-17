@@ -234,6 +234,8 @@ class DictRDD(TupleRDD):
             raise ValueError("Every column must be a string!")
         if len(columns) != len(self.first()):  # optional?
             raise ValueError("Number of values doesn't match with columns!")
+        if not len(columns) == len(set(columns)):
+            raise ValueError("Column names must be unique!")
         self._cols = tuple(columns)  # TODO: unique
 
     def ix(self, index):

@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from sklearn.base import ClassifierMixin
 from sklearn.metrics import accuracy_score
 

@@ -1,22 +1,15 @@
+# -*- coding: utf-8 -*-
+
 from __future__ import print_function
 
-from abc import ABCMeta, abstractmethod
-from collections import Mapping, namedtuple, Sized
-from functools import partial, reduce
-from itertools import product
-import operator
-import warnings
+from collections import Sized
 
 import numpy as np
 
 from sklearn.base import clone
-
-from sklearn.cross_validation import _check_cv as check_cv
-from sklearn.cross_validation import _fit_and_score
 from sklearn.externals.joblib import Parallel, delayed
 from sklearn.metrics.scorer import check_scoring
-
-from sklearn.grid_search import GridSearchCV, _check_param_grid, _num_samples, check_scoring, ParameterGrid, _CVScoreTuple
+from sklearn.grid_search import GridSearchCV, ParameterGrid, _CVScoreTuple
 
 from splearn.cross_validation import _check_cv, _fit_and_score
 
@@ -25,20 +18,9 @@ class SparkGridSearchCV(GridSearchCV):
 
     def _fit(self, Z, parameter_iterable):
         """Actual fitting,  performing the search over parameters."""
-        # X, y = Z[['X', 'y']]  # DictRDD
-
-        estimator = self.estimator
-        cv = self.cv
         self.scorer_ = check_scoring(self.estimator, scoring=self.scoring)
 
-        # n_samples = _num_samples(X)
-        # X, y = indexable(X, y)
-
-        # if y is not None:  # ?
-        #     if len(y) != n_samples:
-        #         raise ValueError('Target variable (y) has a different number '
-        #                          'of samples (%i) than data (X: %i samples)'
-        #                          % (len(y), n_samples))
+        cv = self.cv
         cv = _check_cv(cv, Z)
 
         if self.verbose > 0:
@@ -111,4 +93,3 @@ class SparkGridSearchCV(GridSearchCV):
 
     def fit(self, Z):
         return self._fit(Z, ParameterGrid(self.param_grid))
-
