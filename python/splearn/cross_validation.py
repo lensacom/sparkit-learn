@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 
 import time
-import logger
 import numbers
 import warnings
 
 from sklearn.utils.validation import _num_samples
 from sklearn.cross_validation import KFold, FitFailedWarning
+from sklearn.externals.joblib import Parallel, delayed, logger
 
 
 def _check_cv(cv, Z=None):
