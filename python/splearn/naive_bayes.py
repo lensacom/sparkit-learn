@@ -168,6 +168,9 @@ class SparkBaseDiscreteNB(BaseDiscreteNB, SparkBaseNB):
         model : splearn Naive Bayes model
             Model with updated coefficients.
         """
+        # The rdd operator add does not consider __radd__ :(
+        if other == 0:
+            return self
         model = copy.deepcopy(self)
         model.class_count_ += other.class_count_
         model.feature_count_ += other.feature_count_
