@@ -81,7 +81,6 @@ def block(rdd, block_size=None):
 
 # TODO: cache shape etc.
 
-
 class ArrayRDD(object):
 
     def __init__(self, rdd, block_size=None):
@@ -125,12 +124,12 @@ class ArrayRDD(object):
         return self.shape[0]
 
     def ix(self, index):
-        if index == slice(None, None, None):
+        if isinstance(index, tuple):
+            raise IndexError("Too many indices for ArrayRDD")
+        elif isinstance(index, slice) and index == slice(None, None, None):
             return self
 
         indexed = self.zipWithIndex()
-        if isinstance(index, tuple):
-            raise IndexError("Too many indices for ArrayRDD")
         if isinstance(index, slice):
             indices = range(self.count())[index]
             ascending = index.step > 0
@@ -141,7 +140,7 @@ class ArrayRDD(object):
         elif hasattr(index, "__iter__"):
             rdd = indexed.filter(lambda (x, i): i in index)
         else:
-            raise KeyError("Unexpected type of key: {0}".format(type(index)))
+            raise KeyError("Unexpected type of index: {0}".format(type(index)))
 
         return rdd.map(lambda (x, i): x)
 
@@ -164,6 +163,9 @@ class ArrayRDD(object):
     def tolist(self):
         return self._rdd.flatMap(lambda x: list(x))
 
+    def toarray(self):
+        return np.array(self.tolist())
+
     def toiter(self):
         javaiter = self._rdd._jrdd.toLocalIterator()
         return self._rdd._collect_iterator_through_file(javaiter)
@@ -182,7 +184,7 @@ class TupleRDD(ArrayRDD):
 
     def __len__(self):
         # returns number of elements (not blocks)
-        return self.__getitem__(0).shape[0]
+        return self.get(0).shape[0]
 
     def __getitem__(self, key):
         if isinstance(key, tuple):  # get first index
@@ -196,13 +198,18 @@ class TupleRDD(ArrayRDD):
     def get(self, key):
         if isinstance(key, tuple):
             raise IndexError("Too many indices for TupleRDD")
-        elif key == slice(None, None, None):
-            return self
+        elif isinstance(key, slice):
+            if key == slice(None, None, None):
+                return self
+            rdd = self.map(lambda x: x[key])
+            return TupleRDD(rdd)
         elif hasattr(key, "__iter__"):
             rdd = self.map(lambda x: tuple(x[i] for i in key))
             return TupleRDD(rdd)
-        else:
+        elif isinstance(key, int):
             return self.map(lambda x: x[key])
+        else:
+            raise KeyError("Unexpected type of key: {0}".format(type(key)))
 
     @property
     def columns(self):
@@ -233,19 +240,25 @@ class DictRDD(TupleRDD):
         self._cols = tuple(columns)
 
     def ix(self, index):
-        return DictRDD(super(DictRDD, self).ix(index))
+        return DictRDD(super(DictRDD, self).ix(index), columns=self._cols)
 
     def get(self, key):
         if isinstance(key, tuple):
             raise IndexError("Too many indices for DictRDD")
-        elif tuple(key) == self._cols:
+        elif isinstance(key, slice) and key == slice(None, None, None):
             return self
         elif hasattr(key, "__iter__"):
+            if tuple(key) == self._cols:
+                return self
             indices = [self._cols.index(k) for k in key]
             return DictRDD(super(DictRDD, self).get(indices), columns=key)
         else:
             index = self._cols.index(key)
             return super(DictRDD, self).get(index)
+
+    def __len__(self):
+        # returns number of elements (not blocks)
+        return super(DictRDD, self).get(0).shape[0]
 
     def __contains__(self, key):
         return key in self._cols

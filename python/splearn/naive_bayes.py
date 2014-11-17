@@ -6,8 +6,9 @@ from sklearn.naive_bayes import BaseNB
 from sklearn.naive_bayes import BaseDiscreteNB, GaussianNB
 from sklearn.naive_bayes import MultinomialNB, BernoulliNB
 
+from splearn.base import SparkClassifierMixin
 
-class SparkBaseNB(BaseNB):
+class SparkBaseNB(BaseNB, SparkClassifierMixin):
     """Abstract base class for distributed naive Bayes estimators"""
 
     def __radd__(self, other):
@@ -112,7 +113,7 @@ class SparkGaussianNB(GaussianNB, SparkBaseNB):
         self : object
             Returns self.
         """
-        models = Z[['X', 'y']].map(
+        models = Z[:, ['X', 'y']].map(
             lambda (X, y): self.partial_fit(X, y, classes))
         avg = models.sum()
         self.__dict__.update(avg.__dict__)
@@ -192,11 +193,11 @@ class SparkBaseDiscreteNB(BaseDiscreteNB, SparkBaseNB):
         self : object
             Returns self.
         """
-        if 'w' in Z:
-            models = Z[['X', 'y', 'w']].map(
+        if 'w' in Z.columns:
+            models = Z[:, ['X', 'y', 'w']].map(
                 lambda (X, y, w): self.partial_fit(X, y, classes, w))
         else:
-            models = Z[['X', 'y']].map(
+            models = Z[:, ['X', 'y']].map(
                 lambda (X, y): self.partial_fit(X, y, classes))
         avg = models.sum()
         self.__dict__.update(avg.__dict__)

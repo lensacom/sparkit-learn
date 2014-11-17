@@ -5,55 +5,55 @@ import time
 from sklearn.utils.validation import _num_samples
 from sklearn.cross_validation import _score
 
+import warnings
+from itertools import chain, combinations
+from math import ceil, floor, factorial
+import numbers
+import time
+from abc import ABCMeta, abstractmethod
 
-def _fit_and_score(estimator, train_Z, test_Z, scorer, verbose,
+import numpy as np
+import scipy.sparse as sp
+
+from sklearn.base import is_classifier, clone
+from sklearn.utils import indexable, check_random_state, safe_indexing
+from sklearn.utils.validation import _num_samples, check_array
+from sklearn.utils.multiclass import type_of_target
+from sklearn.externals.joblib import Parallel, delayed, logger
+from sklearn.externals.six import with_metaclass
+from sklearn.externals.six.moves import zip
+from sklearn.metrics.scorer import check_scoring
+
+from sklearn.cross_validation import KFold, StratifiedKFold, FitFailedWarning
+
+
+def _check_cv(cv, Z=None):
+    # This exists for internal use while indices is being deprecated.
+    if cv is None:
+        cv = 3
+    if isinstance(cv, numbers.Integral):
+        n_samples = Z.count()
+        cv = KFold(n_samples, cv, indices=True)
+    if not getattr(cv, "_indices", True):
+        raise ValueError("Sparse data and lists require indices-based cross"
+                         " validation generator, got: %r", cv)
+    return cv
+
+
+def _score(estimator, Z_test, scorer):
+    print scorer
+    """Compute the score of an estimator on a given test set."""
+    score = scorer(estimator, Z_test)
+    if not isinstance(score, numbers.Number):
+        raise ValueError("scoring must return a number, got %s (%s) instead."
+                         % (str(score), type(score)))
+    return score
+
+
+def _fit_and_score(estimator, Z, scorer, train, test, verbose,
                    parameters, fit_params, return_train_score=False,
                    return_parameters=False, error_score='raise'):
-    """Fit estimator and compute scores for a given dataset split.
-    Parameters
-    ----------
-    estimator : estimator object implementing 'fit'
-        The object to use to fit the data.
-    X : array-like of shape at least 2D
-        The data to fit.
-    y : array-like, optional, default: None
-        The target variable to try to predict in the case of
-        supervised learning.
-    scoring : callable
-        A scorer callable object / function with signature
-        ``scorer(estimator, X, y)``.
-    train : array-like, shape (n_train_samples,)
-        Indices of training samples.
-    test : array-like, shape (n_test_samples,)
-        Indices of test samples.
-    verbose : integer
-        The verbosity level.
-    error_score : 'raise' (default) or numeric
-        Value to assign to the score if an error occurs in estimator fitting.
-        If set to 'raise', the error is raised. If a numeric value is given,
-        FitFailedWarning is raised. This parameter does not affect the refit
-        step, which will always raise the error.
-    parameters : dict or None
-        Parameters to be set on the estimator.
-    fit_params : dict or None
-        Parameters that will be passed to ``estimator.fit``.
-    return_train_score : boolean, optional, default: False
-        Compute and return score on training set.
-    return_parameters : boolean, optional, default: False
-        Return parameters that has been used for the estimator.
-    Returns
-    -------
-    train_score : float, optional
-        Score on training set, returned only if `return_train_score` is `True`.
-    test_score : float
-        Score on test set.
-    n_test_samples : int
-        Number of test samples.
-    scoring_time : float
-        Time spent for fitting and scoring in seconds.
-    parameters : dict or None, optional
-        The parameters that have been evaluated.
-    """
+
     if verbose > 1:
         if parameters is None:
             msg = "no parameters to be set"
@@ -63,21 +63,41 @@ def _fit_and_score(estimator, train_Z, test_Z, scorer, verbose,
         print("[CV] %s %s" % (msg, (64 - len(msg)) * '.'))
 
     # Adjust lenght of sample weights
-    n_samples = len(Z_train)
-    fit_params = fit_params if fit_params is not None else {}
-    fit_params = dict([(k, np.asarray(v)
-                       if hasattr(v, '__len__') and len(v) == n_samples else v)
-                       for k, v in fit_params.items()])
+    # n_samples = _num_samples(X)
+    # fit_params = fit_params if fit_params is not None else {}
+    # fit_params = dict([(k, np.asarray(v)[train]
+    #                    if hasattr(v, '__len__') and len(v) == n_samples else v)
+    #                    for k, v in fit_params.items()])
 
     if parameters is not None:
         estimator.set_params(**parameters)
 
     start_time = time.time()
 
-    estimator.fit(Z_train, **fit_params).collect()
-    test_score = _score(estimator, Z_test, scorer)
-    if return_train_score:
-        train_score = _score(estimator, Z_train, scorer)
+    Z_train = Z[train]
+    Z_test = Z[test]
+
+    try:
+        estimator.fit(Z_train, **fit_params)
+    except Exception as e:
+        if error_score == 'raise':
+            raise
+        elif isinstance(error_score, numbers.Number):
+            test_score = error_score
+            if return_train_score:
+                train_score = error_score
+            warnings.warn("Classifier fit failed. The score on this train-test"
+                          " partition for these parameters will be set to %f. "
+                          "Details: \n%r" % (error_score, e), FitFailedWarning)
+        else:
+            raise ValueError("error_score must be the string 'raise' or a"
+                             " numeric value. (Hint: if using 'raise', please"
+                             " make sure that it has been spelled correctly.)"
+                             )
+    else:
+        test_score = _score(estimator, Z_test, scorer)
+        if return_train_score:
+            train_score = _score(estimator, Z_train, scorer)
 
     scoring_time = time.time() - start_time
 
@@ -88,16 +108,7 @@ def _fit_and_score(estimator, train_Z, test_Z, scorer, verbose,
         print("[CV] %s %s" % ((64 - len(end_msg)) * '.', end_msg))
 
     ret = [train_score] if return_train_score else []
-    ret.extend([test_score, _num_samples(X_test), scoring_time])
+    ret.extend([test_score, _num_samples(Z_test), scoring_time])
     if return_parameters:
         ret.append(parameters)
     return ret
-
-
-def _score(estimator, Z_test, scorer):
-    """Compute the score of an estimator on a given test set."""
-    score = scorer(estimator, Z_test)
-    if not isinstance(score, numbers.Number):
-        raise ValueError("scoring must return a number, got %s (%s) instead."
-                         % (str(score), type(score)))
-    return score
