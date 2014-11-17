@@ -37,3 +37,12 @@ class SparkPipeline(Pipeline):
             return self.steps[-1][-1].fit_transform(Zt, **fit_params)
         else:
             return self.steps[-1][-1].fit(Zt, **fit_params).transform(Zt)
+
+    def score(self, Z):
+        """Applies transforms to the data, and the score method of the
+        final estimator. Valid only if the final estimator implements
+        score."""
+        Zt = Z
+        for name, transform in self.steps[:-1]:
+            Zt = transform.transform(Zt)
+        return self.steps[-1][-1].score(Zt)
