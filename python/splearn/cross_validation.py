@@ -41,7 +41,6 @@ def _check_cv(cv, Z=None):
 
 
 def _score(estimator, Z_test, scorer):
-    print scorer
     """Compute the score of an estimator on a given test set."""
     score = scorer(estimator, Z_test)
     if not isinstance(score, numbers.Number):

@@ -93,7 +93,8 @@ class ArrayRDD(object):
             else:
                 self._rdd = self._block(rdd, block_size)
         else:
-            pass  # raise exception
+            raise TypeError(
+                "Unexpected type {0} for parameter rdd".format(type(rdd)))
 
     def _block(self, rdd, block_size):
         return rdd.mapPartitions(lambda x: _block_collection(x, block_size))
@@ -120,8 +121,8 @@ class ArrayRDD(object):
         return self.ix(key)
 
     def __len__(self):
-        # returns number of elements (not blocks)
-        return self.shape[0]
+        # returns number of blocks
+        return self.count()
 
     def ix(self, index):
         if isinstance(index, tuple):
@@ -164,7 +165,7 @@ class ArrayRDD(object):
         return self._rdd.flatMap(lambda x: list(x))
 
     def toarray(self):
-        return np.array(self.tolist())
+        return np.array(self.tolist().collect())
 
     def toiter(self):
         javaiter = self._rdd._jrdd.toLocalIterator()
@@ -181,10 +182,6 @@ class TupleRDD(ArrayRDD):
 
     def _block(self, rdd, block_size):
         return rdd.mapPartitions(lambda x: _block_tuple(x, block_size))
-
-    def __len__(self):
-        # returns number of elements (not blocks)
-        return self.get(0).shape[0]
 
     def __getitem__(self, key):
         if isinstance(key, tuple):  # get first index
@@ -217,7 +214,7 @@ class TupleRDD(ArrayRDD):
 
     @property
     def shape(self):
-        return (self.__len__(), self.columns)
+        return (self.get(0).shape[0], self.columns)
 
     def transform(self, f, column=None):
         if column is not None:
@@ -237,7 +234,7 @@ class DictRDD(TupleRDD):
             raise ValueError("Every column must be a string!")
         if len(columns) != len(self.first()):  # optional?
             raise ValueError("Number of values doesn't match with columns!")
-        self._cols = tuple(columns)
+        self._cols = tuple(columns)  # TODO: unique
 
     def ix(self, index):
         return DictRDD(super(DictRDD, self).ix(index), columns=self._cols)
@@ -256,16 +253,16 @@ class DictRDD(TupleRDD):
             index = self._cols.index(key)
             return super(DictRDD, self).get(index)
 
-    def __len__(self):
-        # returns number of elements (not blocks)
-        return super(DictRDD, self).get(0).shape[0]
-
     def __contains__(self, key):
         return key in self._cols
 
     @property
     def columns(self):
         return self._cols
+
+    @property
+    def shape(self):
+        return (super(DictRDD, self).get(0).shape[0], self.columns)
 
     def transform(self, f, column=None):
         if column is not None:

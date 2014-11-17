@@ -11,7 +11,7 @@ from sklearn.datasets import make_regression
 from sklearn.linear_model import LinearRegression
 
 from common import SplearnTestCase
-from splearn.rdd import ArrayRDD, TupleRDD
+from splearn.rdd import ArrayRDD, DictRDD
 from splearn.linear_model import SparkLinearRegression
 
 
@@ -34,7 +34,7 @@ class LinearModelBaseTestCase(SplearnTestCase):
         X_rdd = self.sc.parallelize(X)
         y_rdd = self.sc.parallelize(y)
 
-        Z = TupleRDD(X_rdd.zip(y_rdd), blocks)
+        Z = DictRDD(X_rdd.zip(y_rdd), columns=('X', 'y'), block_size=blocks)
 
         return X, y, Z
 
@@ -48,6 +48,6 @@ class TestLinearRegression(LinearModelBaseTestCase):
         dist = SparkLinearRegression()
 
         y_local = local.fit(X, y).predict(X)
-        y_dist = dist.fit(Z).predict(Z.column(0))
+        y_dist = dist.fit(Z).predict(Z[:, 'X'])
 
         assert_array_almost_equal(y_local, np.concatenate(y_dist.collect()))

@@ -50,6 +50,6 @@ class TestMultinomialNB(NaiveBayesTestCase):
         dist = SparkMultinomialNB()
 
         y_local = local.fit(X, y).predict(X)
-        y_dist = dist.fit(Z, classes=np.unique(y)).predict(Z['X'])
+        y_dist = dist.fit(Z, classes=np.unique(y)).predict(Z[:, 'X'])
 
         assert_array_almost_equal(y_local, np.concatenate(y_dist.collect()))
