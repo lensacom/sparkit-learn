@@ -3,12 +3,15 @@ import tempfile
 import numpy as np
 import scipy.sparse as sp
 
-from nose.tools import assert_equal
-from nose.tools import assert_true
-from numpy.testing import assert_array_almost_equal
+
+from sklearn.utils.testing import assert_true
+from sklearn.utils.testing import assert_equal
+from sklearn.utils.testing import assert_raises
+from sklearn.utils.testing import assert_array_almost_equal
 
 from common import SplearnTestCase
 from splearn.rdd import block
+from splearn.rdd import ArrayRDD, TupleRDD, DictRDD
 
 
 class RDDTestCase(SplearnTestCase):
@@ -110,15 +113,39 @@ class TestBlockRDD(RDDTestCase):
     #     data = self.sc.parallelize(dicts, n_partitions)
 
     #     block_data_5 = block(data, block_size=5)
-    #     blocks = block_data_5['a'].collect()
+    #     blocks = block_data_5.collect()
     #     assert_true(all(len(b) <= 5 for b in blocks))
-    #     assert_array_almost_equal(blocks['a'], np.arange(5))
-    #     assert_array_almost_equal(blocks[0].b,
+    #     assert_array_almost_equal(blocks[0][0], np.arange(5))
+    #     assert_array_almost_equal(blocks[0][1],
     #                               np.arange(5, dtype=np.float) ** 2)
 
 
 class TestArrayRDD(RDDTestCase):
-    pass
+
+    def test_initialization(self):
+        n_partitions = 10
+        n_samples = 100
+
+        data = [np.array([1]) for i in range(n_samples)]
+        rdd = self.sc.parallelize(data, n_partitions)
+
+        assert_raises(TypeError, ArrayRDD, data, None)
+        assert_raises(TypeError, ArrayRDD, data, False)
+        assert_raises(TypeError, ArrayRDD, data, 10)
+
+
+
+        # n_partitions = 3
+        # n_samples = 57
+        # dicts = [{'a': i, 'b': float(i) ** 2} for i in range(n_samples)]
+        # data = self.sc.parallelize(dicts, n_partitions)
+
+        # block_data_5 = block(data, block_size=5)
+        # blocks = block_data_5.collect()
+        # assert_true(all(len(b) <= 5 for b in blocks))
+        # assert_array_almost_equal(blocks[0][0], np.arange(5))
+        # assert_array_almost_equal(blocks[0][1],
+        #                           np.arange(5, dtype=np.float) ** 2)
 
 
 class TestTupleRDD(RDDTestCase):
