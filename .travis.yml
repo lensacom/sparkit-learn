@@ -8,7 +8,7 @@ virtualenv:
 install:
   # Install Spark
   - wget http://d3kbcqa49mib13.cloudfront.net/spark-1.1.0-bin-hadoop2.4.tgz
-  - tar -xzf http://d3kbcqa49mib13.cloudfront.net/spark-1.1.0-bin-hadoop2.4.tgz
+  - tar -xzf spark-1.1.0-bin-hadoop2.4.tgz
   - sudo apt-get install -qq python-numpy python-scipy python-pandas python-sklearn
   - pip install -r requirements.txt
   # Workaround for Travis issue with POSIX semaphores; see
