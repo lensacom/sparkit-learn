@@ -3,10 +3,10 @@ import tempfile
 import numpy as np
 import scipy.sparse as sp
 
+from nose.tools import assert_true
+from nose.tools import assert_raises
+from nose.tools import assert_equal
 
-from sklearn.utils.testing import assert_true
-from sklearn.utils.testing import assert_equal
-from sklearn.utils.testing import assert_raises
 from sklearn.utils.testing import assert_array_almost_equal
 
 from common import SplearnTestCase
