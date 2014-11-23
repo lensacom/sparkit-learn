@@ -31,9 +31,10 @@ class GridSearchTestCase(SplearnTestCase):
                                    random_state=42)
         X = np.abs(X)
 
-        X_rdd = self.sc.parallelize(X)
-        y_rdd = self.sc.parallelize(y)
-        Z = DictRDD(X_rdd.zip(y_rdd), columns=('X', 'y'), block_size=blocks)
+        X_rdd = self.sc.parallelize(X, 4)
+        y_rdd = self.sc.parallelize(y, 4)
+        Z_rdd = X_rdd.zip(y_rdd)
+        Z = DictRDD(Z_rdd, columns=('X', 'y'), block_size=blocks)
 
         return X, y, Z
 
@@ -41,7 +42,7 @@ class GridSearchTestCase(SplearnTestCase):
 class TestGridSearchCV(GridSearchTestCase):
 
     def test_same_result(self):
-        X, y, Z = self.generate_dataset(2, 30000, 5001)
+        X, y, Z = self.generate_dataset(2, 40000, None)
 
         parameters = {'alpha': [0.1, 1, 10]}
         fit_params = {'classes': np.unique(y)}
