@@ -8,6 +8,7 @@ from nose.tools import assert_raises
 from nose.tools import assert_equal
 
 from numpy.testing import assert_array_less
+from numpy.testing import assert_array_equal
 
 from sklearn.utils.testing import assert_array_almost_equal
 
@@ -175,13 +176,66 @@ class TestArrayRDD(RDDTestCase):
         assert_true(all(np.in1d(shapes, [66, 34])))
 
     def test_get_single_item(self):
-        pass
+        data = np.arange(400).reshape((100, 4))
+        rdd = self.sc.parallelize(data, 4)
+        X = ArrayRDD(rdd, 5)
+
+        expected = np.arange(0, 20).reshape((5, 4))
+        assert_array_equal(X.first(), expected)
+        assert_array_equal(X[0].first(), expected)
+        assert_array_equal(X.ix(0).first(), expected)
+
+        expected = np.arange(20, 40).reshape((5, 4))
+        assert_array_equal(X[1].first(), expected)
+        assert_array_equal(X.ix(1).first(), expected)
+
+        expected = np.arange(380, 400).reshape((5, 4))
+        assert_array_equal(X[19].first(), expected)
+        assert_array_equal(X.ix(19).first(), expected)
+        assert_array_equal(X[-1].first(), expected)
+        assert_array_equal(X.ix(-1).first(), expected)
+
+        expected = np.arange(340, 360).reshape((5, 4))
+        assert_array_equal(X[17].first(), expected)
+        assert_array_equal(X.ix(17).first(), expected)
+        assert_array_equal(X[-3].first(), expected)
+        assert_array_equal(X.ix(-3).first(), expected)
 
     def test_get_multiple_item(self):
-        pass
+        data = np.arange(400).reshape((100, 4))
+        rdd = self.sc.parallelize(data, 4)
+        X = ArrayRDD(rdd, 5)
+
+        exp0th = np.arange(0, 20).reshape((5, 4))
+        exp1st = np.arange(20, 40).reshape((5, 4))
+        exp2nd = np.arange(40, 60).reshape((5, 4))
+        exp7th = np.arange(140, 160).reshape((5, 4))
+        exp18th = np.arange(360, 380).reshape((5, 4))
+        exp19th = np.arange(380, 400).reshape((5, 4))
+
+        assert_array_equal(X[[0, 1]].collect(), [exp0th, exp1st])
+        assert_array_equal(X[[0, 2]].collect(), [exp0th, exp2nd])
+        assert_array_equal(X[[0, -1]].collect(), [exp0th, exp19th])
+        assert_array_equal(X[[0, -2]].collect(), [exp0th, exp18th])
+        assert_array_equal(X[[1, -2]].collect(), [exp1st, exp18th])
+        assert_array_equal(X[[7, 0]].collect(), [exp7th, exp0th])
+        assert_array_equal(X[[1, 2, 7, 19]].collect(),
+                          [exp1st, exp2nd, exp7th, exp19th])
 
     def test_array_slice_syntax(self):
-        pass
+        data = np.arange(400).reshape((100, 4))
+        rdd = self.sc.parallelize(data, 4)
+        X = ArrayRDD(rdd, 5)
+
+        exp0th = np.arange(0, 20).reshape((5, 4))
+        exp1st = np.arange(20, 40).reshape((5, 4))
+        exp2nd = np.arange(40, 60).reshape((5, 4))
+        exp7th = np.arange(140, 160).reshape((5, 4))
+        exp8th = np.arange(160, 180).reshape((5, 4))
+        exp9th = np.arange(180, 200).reshape((5, 4))
+
+        assert_array_equal(X[:1].collect(), [exp0th])
+        # assert_array_equal(X[:2].collect(), [exp0th, exp1st])
 
 
 class TestTupleRDD(RDDTestCase):

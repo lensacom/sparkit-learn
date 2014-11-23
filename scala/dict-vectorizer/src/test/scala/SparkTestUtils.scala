@@ -21,7 +21,7 @@ trait SparkTestUtils extends FunSuite {
         sc.stop
         sc = null
         System.clearProperty("spark.master.port")
-	SparkUtil.restoreLogLevels(prevLevels)
+        SparkUtil.restoreLogLevels(prevLevels)
       }
     }
   }
