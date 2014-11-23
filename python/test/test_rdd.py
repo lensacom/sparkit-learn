@@ -7,6 +7,8 @@ from nose.tools import assert_true
 from nose.tools import assert_raises
 from nose.tools import assert_equal
 
+from numpy.testing import assert_array_less
+
 from sklearn.utils.testing import assert_array_almost_equal
 
 from common import SplearnTestCase
@@ -124,28 +126,62 @@ class TestArrayRDD(RDDTestCase):
 
     def test_initialization(self):
         n_partitions = 10
-        n_samples = 100
+        n_samples = 1000
 
-        data = [np.array([1]) for i in range(n_samples)]
+        data = [np.array([1, 2]) for i in range(n_samples)]
         rdd = self.sc.parallelize(data, n_partitions)
 
-        assert_raises(TypeError, ArrayRDD, data, None)
+        assert_raises(TypeError, ArrayRDD, data)
         assert_raises(TypeError, ArrayRDD, data, False)
         assert_raises(TypeError, ArrayRDD, data, 10)
 
+        assert_true(isinstance(ArrayRDD(rdd), ArrayRDD))
+        assert_true(isinstance(ArrayRDD(rdd, 10), ArrayRDD))
+        assert_true(isinstance(ArrayRDD(rdd, None), ArrayRDD))
 
+    def test_blocks_number(self):
+        n_partitions = 10
+        n_samples = 1000
 
-        # n_partitions = 3
-        # n_samples = 57
-        # dicts = [{'a': i, 'b': float(i) ** 2} for i in range(n_samples)]
-        # data = self.sc.parallelize(dicts, n_partitions)
+        data = [np.array([1, 2]) for i in range(n_samples)]
+        rdd = self.sc.parallelize(data, n_partitions)
 
-        # block_data_5 = block(data, block_size=5)
-        # blocks = block_data_5.collect()
-        # assert_true(all(len(b) <= 5 for b in blocks))
-        # assert_array_almost_equal(blocks[0][0], np.arange(5))
-        # assert_array_almost_equal(blocks[0][1],
-        #                           np.arange(5, dtype=np.float) ** 2)
+        assert_equal(1000, ArrayRDD(rdd, False).blocks)
+
+        assert_equal(10, ArrayRDD(rdd).blocks)
+        assert_equal(20, ArrayRDD(rdd, 50).blocks)
+        assert_equal(20, ArrayRDD(rdd, 66).blocks)
+        assert_equal(10, ArrayRDD(rdd, 100).blocks)
+        assert_equal(10, ArrayRDD(rdd, 300).blocks)
+        assert_equal(200, ArrayRDD(rdd, 5).blocks)
+        assert_equal(100, ArrayRDD(rdd, 10).blocks)
+
+    def test_blocks_size(self):
+        n_partitions = 10
+        n_samples = 1000
+
+        data = [np.array([1, 2]) for i in range(n_samples)]
+        rdd = self.sc.parallelize(data, n_partitions)
+
+        shapes = ArrayRDD(rdd).map(lambda x: x.shape[0]).collect()
+        assert_true(all(np.array(shapes) == 100))
+        shapes = ArrayRDD(rdd, 5).map(lambda x: x.shape[0]).collect()
+        assert_true(all(np.array(shapes) == 5))
+        shapes = ArrayRDD(rdd, 50).map(lambda x: x.shape[0]).collect()
+        assert_true(all(np.array(shapes) == 50))
+        shapes = ArrayRDD(rdd, 250).map(lambda x: x.shape[0]).collect()
+        assert_true(all(np.array(shapes) == 100))
+        shapes = ArrayRDD(rdd, 66).map(lambda x: x.shape[0]).collect()
+        assert_true(all(np.in1d(shapes, [66, 34])))
+
+    def test_get_single_item(self):
+        pass
+
+    def test_get_multiple_item(self):
+        pass
+
+    def test_array_slice_syntax(self):
+        pass
 
 
 class TestTupleRDD(RDDTestCase):
