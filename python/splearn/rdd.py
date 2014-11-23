@@ -133,7 +133,7 @@ class ArrayRDD(object):
         indexed = self.zipWithIndex()
         indices = np.arange(self.count())[index]
         if isinstance(index, slice):
-            ascending = index.step > 0
+            ascending = index.step is None or index.step > 0
             rdd = indexed.filter(lambda (x, i): i in indices) \
                          .sortBy(lambda (x, i): i, ascending)
         elif hasattr(index, "__iter__"):
