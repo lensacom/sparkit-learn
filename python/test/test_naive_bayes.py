@@ -8,10 +8,12 @@ from nose.tools import assert_true
 from numpy.testing import assert_array_almost_equal
 
 from sklearn.datasets import make_classification
+from sklearn.naive_bayes import GaussianNB
 from sklearn.naive_bayes import MultinomialNB
 
 from common import SplearnTestCase
 from splearn.rdd import ArrayRDD, DictRDD
+from splearn.naive_bayes import SparkGaussianNB
 from splearn.naive_bayes import SparkMultinomialNB
 
 
@@ -41,6 +43,22 @@ class NaiveBayesTestCase(SplearnTestCase):
         return X, y, Z
 
 
+class TestGaussianNB(NaiveBayesTestCase):
+
+    def test_same_prediction(self):
+        X, y, Z = self.generate_dataset(4, 100000)
+
+        local = GaussianNB()
+        dist = SparkGaussianNB()
+
+        local_model = local.fit(X, y)
+        dist_model = dist.fit(Z, classes=np.unique(y))
+
+        # TODO: investigate the variance further!
+        assert_array_almost_equal(local_model.sigma_, dist_model.sigma_, 1)
+        assert_array_almost_equal(local_model.theta_, dist_model.theta_, 6)
+
+
 class TestMultinomialNB(NaiveBayesTestCase):
 
     def test_same_prediction(self):
@@ -53,3 +71,5 @@ class TestMultinomialNB(NaiveBayesTestCase):
         y_dist = dist.fit(Z, classes=np.unique(y)).predict(Z[:, 'X'])
 
         assert_array_almost_equal(y_local, np.concatenate(y_dist.collect()))
+
+
