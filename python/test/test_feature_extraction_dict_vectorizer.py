@@ -8,13 +8,12 @@ from nose.tools import assert_true
 from numpy.testing import assert_array_almost_equal
 from numpy.testing import assert_array_equal
 
-from sklearn.feature_extraction.tests.test_text import ALL_FOOD_DOCS
-
 from common import SplearnTestCase
 from splearn.rdd import ArrayRDD, DictRDD
 from splearn.feature_extraction import SparkDictVectorizer
 
 from sklearn.feature_extraction import DictVectorizer
+
 
 class FeatureExtractionDictVectorizerTestCase(SplearnTestCase):
 
