@@ -19,6 +19,8 @@ class SparkLogisticRegression(LogisticRegression, SparkLinearModelMixin):
         pass
 
     def fit(self, Z, classes=None):
+        # possible improve to partial_fit in partisions and then average
+        # in final reduce
         self._classes_ = np.unique(classes)
         return self._spark_fit(SparkLogisticRegression, Z)
 
