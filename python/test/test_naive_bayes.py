@@ -29,14 +29,13 @@ class NaiveBayesTestCase(SplearnTestCase):
 
     def generate_dataset(self, classes, samples, blocks=None):
         X, y = make_classification(n_classes=classes,
-                                   n_samples=samples, n_features=20,
-                                   n_informative=10, n_redundant=0,
+                                   n_samples=samples, n_features=4,
                                    n_clusters_per_class=1,
                                    random_state=42)
         X = np.abs(X)
 
-        X_rdd = self.sc.parallelize(X)
-        y_rdd = self.sc.parallelize(y)
+        X_rdd = self.sc.parallelize(X, 4)
+        y_rdd = self.sc.parallelize(y, 4)
 
         Z = DictRDD(X_rdd.zip(y_rdd), columns=('X', 'y'), block_size=blocks)
 
@@ -46,7 +45,7 @@ class NaiveBayesTestCase(SplearnTestCase):
 class TestGaussianNB(NaiveBayesTestCase):
 
     def test_same_prediction(self):
-        X, y, Z = self.generate_dataset(4, 100000)
+        X, y, Z = self.generate_dataset(2, 800000)
 
         local = GaussianNB()
         dist = SparkGaussianNB()
@@ -55,7 +54,7 @@ class TestGaussianNB(NaiveBayesTestCase):
         dist_model = dist.fit(Z, classes=np.unique(y))
 
         # TODO: investigate the variance further!
-        assert_array_almost_equal(local_model.sigma_, dist_model.sigma_, 1)
+        assert_array_almost_equal(local_model.sigma_, dist_model.sigma_, 2)
         assert_array_almost_equal(local_model.theta_, dist_model.theta_, 6)
 
 

@@ -131,15 +131,17 @@ class ArrayRDD(object):
             return self
 
         indexed = self.zipWithIndex()
+        indices = np.arange(self.count())[index]
         if isinstance(index, slice):
-            indices = range(self.count())[index]
-            ascending = index.step > 0
+            ascending = index.step is None or index.step > 0
             rdd = indexed.filter(lambda (x, i): i in indices) \
                          .sortBy(lambda (x, i): i, ascending)
-        elif isinstance(index, int):
-            rdd = indexed.filter(lambda (x, i): i == index)
         elif hasattr(index, "__iter__"):
-            rdd = indexed.filter(lambda (x, i): i in index)
+            arg = indices.tolist()
+            rdd = indexed.filter(lambda (x, i): i in indices) \
+                         .sortBy(lambda (x, i): arg.index(i))
+        elif isinstance(index, int):
+            rdd = indexed.filter(lambda (x, i): i == indices)
         else:
             raise KeyError("Unexpected type of index: {0}".format(type(index)))
 

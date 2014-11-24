@@ -5,9 +5,39 @@ from ..rdd import DictRDD, ArrayRDD
 import numpy as np
 import scipy.sparse as sp
 
+from collections import defaultdict
+
 from sklearn.feature_extraction.text import CountVectorizer, HashingVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.feature_extraction.text import _document_frequency
+
+
+class SparkCountVectorizer(CountVectorizer):
+
+    def _count_vocab(self, raw_documents, fixed_vocab):
+        if isinstance(raw_documents, DictRDD):
+            raw_documents = raw_documents[:, 'X']
+
+        if fixed_vocab:
+            vocabulary = self.vocabulary_
+        else:
+            mapper = lambda x: super(SparkCountVectorizer, self)._count_vocab(x, False)[0].keys()
+            reducer = lambda x, y: np.unique(np.concatenate([x, y]))
+            keys = raw_documents.map(mapper).reduce(reducer)
+            vocabulary = dict((f, i) for i, f in enumerate(keys))
+            self.vocabulary_ = vocabulary
+
+        self.fixed_vocabulary_ = True
+        mapper = lambda x: \
+            super(SparkCountVectorizer, self)._count_vocab(x, True)[1]
+        return vocabulary, raw_documents.map(mapper)
+
+    def fit(self, raw_documents):
+        self.fit_transform(raw_documents)
+        return self
+
+    def fit_transform(self, raw_documents):
+        return super(SparkCountVectorizer, self).fit_transform(raw_documents)
 
 
 class SparkHashingVectorizer(HashingVectorizer):

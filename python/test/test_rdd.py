@@ -3,10 +3,13 @@ import tempfile
 import numpy as np
 import scipy.sparse as sp
 
+from nose.tools import assert_true
+from nose.tools import assert_raises
+from nose.tools import assert_equal
 
-from sklearn.utils.testing import assert_true
-from sklearn.utils.testing import assert_equal
-from sklearn.utils.testing import assert_raises
+from numpy.testing import assert_array_less
+from numpy.testing import assert_array_equal
+
 from sklearn.utils.testing import assert_array_almost_equal
 
 from common import SplearnTestCase
@@ -124,28 +127,115 @@ class TestArrayRDD(RDDTestCase):
 
     def test_initialization(self):
         n_partitions = 10
-        n_samples = 100
+        n_samples = 1000
 
-        data = [np.array([1]) for i in range(n_samples)]
+        data = [np.array([1, 2]) for i in range(n_samples)]
         rdd = self.sc.parallelize(data, n_partitions)
 
-        assert_raises(TypeError, ArrayRDD, data, None)
+        assert_raises(TypeError, ArrayRDD, data)
         assert_raises(TypeError, ArrayRDD, data, False)
         assert_raises(TypeError, ArrayRDD, data, 10)
 
+        assert_true(isinstance(ArrayRDD(rdd), ArrayRDD))
+        assert_true(isinstance(ArrayRDD(rdd, 10), ArrayRDD))
+        assert_true(isinstance(ArrayRDD(rdd, None), ArrayRDD))
 
+    def test_blocks_number(self):
+        n_partitions = 10
+        n_samples = 1000
 
-        # n_partitions = 3
-        # n_samples = 57
-        # dicts = [{'a': i, 'b': float(i) ** 2} for i in range(n_samples)]
-        # data = self.sc.parallelize(dicts, n_partitions)
+        data = [np.array([1, 2]) for i in range(n_samples)]
+        rdd = self.sc.parallelize(data, n_partitions)
 
-        # block_data_5 = block(data, block_size=5)
-        # blocks = block_data_5.collect()
-        # assert_true(all(len(b) <= 5 for b in blocks))
-        # assert_array_almost_equal(blocks[0][0], np.arange(5))
-        # assert_array_almost_equal(blocks[0][1],
-        #                           np.arange(5, dtype=np.float) ** 2)
+        assert_equal(1000, ArrayRDD(rdd, False).blocks)
+
+        assert_equal(10, ArrayRDD(rdd).blocks)
+        assert_equal(20, ArrayRDD(rdd, 50).blocks)
+        assert_equal(20, ArrayRDD(rdd, 66).blocks)
+        assert_equal(10, ArrayRDD(rdd, 100).blocks)
+        assert_equal(10, ArrayRDD(rdd, 300).blocks)
+        assert_equal(200, ArrayRDD(rdd, 5).blocks)
+        assert_equal(100, ArrayRDD(rdd, 10).blocks)
+
+    def test_blocks_size(self):
+        n_partitions = 10
+        n_samples = 1000
+
+        data = [np.array([1, 2]) for i in range(n_samples)]
+        rdd = self.sc.parallelize(data, n_partitions)
+
+        shapes = ArrayRDD(rdd).map(lambda x: x.shape[0]).collect()
+        assert_true(all(np.array(shapes) == 100))
+        shapes = ArrayRDD(rdd, 5).map(lambda x: x.shape[0]).collect()
+        assert_true(all(np.array(shapes) == 5))
+        shapes = ArrayRDD(rdd, 50).map(lambda x: x.shape[0]).collect()
+        assert_true(all(np.array(shapes) == 50))
+        shapes = ArrayRDD(rdd, 250).map(lambda x: x.shape[0]).collect()
+        assert_true(all(np.array(shapes) == 100))
+        shapes = ArrayRDD(rdd, 66).map(lambda x: x.shape[0]).collect()
+        assert_true(all(np.in1d(shapes, [66, 34])))
+
+    def test_get_single_item(self):
+        data = np.arange(400).reshape((100, 4))
+        rdd = self.sc.parallelize(data, 4)
+        X = ArrayRDD(rdd, 5)
+
+        expected = np.arange(0, 20).reshape((5, 4))
+        assert_array_equal(X.first(), expected)
+        assert_array_equal(X[0].first(), expected)
+        assert_array_equal(X.ix(0).first(), expected)
+
+        expected = np.arange(20, 40).reshape((5, 4))
+        assert_array_equal(X[1].first(), expected)
+        assert_array_equal(X.ix(1).first(), expected)
+
+        expected = np.arange(380, 400).reshape((5, 4))
+        assert_array_equal(X[19].first(), expected)
+        assert_array_equal(X.ix(19).first(), expected)
+        assert_array_equal(X[-1].first(), expected)
+        assert_array_equal(X.ix(-1).first(), expected)
+
+        expected = np.arange(340, 360).reshape((5, 4))
+        assert_array_equal(X[17].first(), expected)
+        assert_array_equal(X.ix(17).first(), expected)
+        assert_array_equal(X[-3].first(), expected)
+        assert_array_equal(X.ix(-3).first(), expected)
+
+    def test_get_multiple_item(self):
+        data = np.arange(400).reshape((100, 4))
+        rdd = self.sc.parallelize(data, 4)
+        X = ArrayRDD(rdd, 5)
+
+        exp0th = np.arange(0, 20).reshape((5, 4))
+        exp1st = np.arange(20, 40).reshape((5, 4))
+        exp2nd = np.arange(40, 60).reshape((5, 4))
+        exp7th = np.arange(140, 160).reshape((5, 4))
+        exp18th = np.arange(360, 380).reshape((5, 4))
+        exp19th = np.arange(380, 400).reshape((5, 4))
+
+        assert_array_equal(X[[0, 1]].collect(), [exp0th, exp1st])
+        assert_array_equal(X[[0, 2]].collect(), [exp0th, exp2nd])
+        assert_array_equal(X[[0, -1]].collect(), [exp0th, exp19th])
+        assert_array_equal(X[[0, -2]].collect(), [exp0th, exp18th])
+        assert_array_equal(X[[1, -2]].collect(), [exp1st, exp18th])
+        assert_array_equal(X[[7, 0]].collect(), [exp7th, exp0th])
+        assert_array_equal(X[[1, 2, 7, 19]].collect(),
+                          [exp1st, exp2nd, exp7th, exp19th])
+
+    def test_array_slice_syntax(self):
+        data = np.arange(400).reshape((100, 4))
+        rdd = self.sc.parallelize(data, 4)
+        X = ArrayRDD(rdd, 5)
+
+        exp0th = np.arange(0, 20).reshape((5, 4))
+        exp1st = np.arange(20, 40).reshape((5, 4))
+        exp2nd = np.arange(40, 60).reshape((5, 4))
+        exp7th = np.arange(140, 160).reshape((5, 4))
+        exp8th = np.arange(160, 180).reshape((5, 4))
+        exp9th = np.arange(180, 200).reshape((5, 4))
+
+        assert_array_equal(X[:1].collect(), [exp0th])
+        # assert_array_equal(X[:2].collect(), [exp0th, exp1st])
 
 
 class TestTupleRDD(RDDTestCase):
