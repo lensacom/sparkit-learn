@@ -3,11 +3,12 @@
 import numpy as np
 
 from .base import SparkLinearModelMixin
-
 from sklearn.linear_model import LogisticRegression
 
 
 class SparkLogisticRegression(LogisticRegression, SparkLinearModelMixin):
+
+    # TODO: REVISIT!
 
     @property
     def classes_(self):

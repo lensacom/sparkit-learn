@@ -10,4 +10,4 @@ implements Stochastic Gradient Descent related algorithms.
 # complete documentation.
 
 from .base import SparkLinearRegression
-from .stochastic_gradient import SparkSGDClassifier
+from .logistic import SparkLogisticRegression
