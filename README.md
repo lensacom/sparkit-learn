@@ -1,7 +1,5 @@
 # scikit-learn on PySpark
 
-[![Build Status](https://travis-ci.org/lensacom/sparkit-learn.png?branch=master)](https://travis-ci.org/lensacom/sparkit-learn)
-
 Experimental repository for supporting scikit-learn functionality and API on PySpark.
 
 # Run IPython from notebooks directory
