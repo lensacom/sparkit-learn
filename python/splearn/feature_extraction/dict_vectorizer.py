@@ -20,6 +20,7 @@ class SparkDictVectorizer(DictVectorizer):
     features in the output, one signifying "f=ham", the other "f=spam".
     Features that do not occur in a sample (mapping) will have a zero value
     in the resulting array/matrix.
+
     Parameters
     ----------
     dtype : callable, optional
@@ -34,6 +35,7 @@ class SparkDictVectorizer(DictVectorizer):
     sort: boolean, optional.
         Whether feature_names_ and vocabulary_ should be sorted when fitting.
         True by default.
+
     Attributes
     ----------
     vocabulary_ : dict
@@ -41,11 +43,12 @@ class SparkDictVectorizer(DictVectorizer):
     feature_names_ : list
         A list of length n_features containing the feature names (e.g., "f=ham"
         and "f=spam").
+
     Examples
     --------
     >>> import numpy as np
     >>> from splearn.feature_extraction import SparkDictVectorizer
-    >>> from splearn.rdd import DictRDD
+    >>> from splearn.rdd import ArrayRDD, DictRDD
     >>> D = np.array([{'foo': 1, 'bar': 2},
     >>>               {'foo': 3, 'baz': 1},
     >>>               {'bar': 2, 'baz': 4},
@@ -66,11 +69,13 @@ class SparkDictVectorizer(DictVectorizer):
 
     def fit(self, Z):
         """Learn a list of feature name -> indices mappings.
+
         Parameters
         ----------
         Z : DictRDD with column 'X'
             Dict(s) or Mapping(s) from feature names (arbitrary Python
             objects) to feature values (strings or convertible to dtype).
+
         Returns
         -------
         self
@@ -90,9 +95,11 @@ class SparkDictVectorizer(DictVectorizer):
 
     def _fit(self, X):
         """Extracts the unique feature names from a list of Mappings.
+
         Parameters
         ----------
         X : List of mappings
+
         Returns
         -------
         set of features
@@ -112,12 +119,14 @@ class SparkDictVectorizer(DictVectorizer):
         to array or sparse matrix.
         Named features not encountered during fit or fit_transform will be
         silently ignored.
+
         Parameters
         ----------
         Z : ArrayRDD or DictRDD with column 'X' containing Mapping or
             iterable over Mappings, length = n_samples
             Dict(s) or Mapping(s) from feature names (arbitrary Python
             objects) to feature values (strings or convertible to dtype).
+
         Returns
         -------
         Z : transformed, containing {array, sparse matrix}
@@ -132,12 +141,14 @@ class SparkDictVectorizer(DictVectorizer):
     def fit_transform(self, Z):
         """Learn a list of feature name -> indices mappings and transform Z.
         Like fit(Z) followed by transform(Z).
+
         Parameters
         ----------
         Z : Z : ArrayRDD or DictRDD with column 'X' containing Mapping or
             iterable over Mappings
             Dict(s) or Mapping(s) from feature names (arbitrary Python
             objects) to feature values (strings or convertible to dtype).
+
         Returns
         -------
         Z : transformed, containing {array, sparse matrix}
