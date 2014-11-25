@@ -130,13 +130,15 @@ class ArrayRDD(object):
         elif isinstance(index, slice) and index == slice(None, None, None):
             return self
 
-        indexed = self.zipWithIndex()
         indices = np.arange(self.count())[index]
+        indexed = self.zipWithIndex()
         if isinstance(index, slice):
             ascending = index.step is None or index.step > 0
-            rdd = indexed.filter(lambda (x, i): i in indices) \
-                         .sortBy(lambda (x, i): i, ascending)
+            rdd = indexed.filter(lambda (x, i): i in indices)
+            if not ascending:
+                rdd = rdd.sortBy(lambda (x, i): i, ascending)
         elif hasattr(index, "__iter__"):
+            # TODO: check monotoniticity to avoid unnunnecessary sorting
             arg = indices.tolist()
             rdd = indexed.filter(lambda (x, i): i in indices) \
                          .sortBy(lambda (x, i): arg.index(i))
@@ -164,10 +166,10 @@ class ArrayRDD(object):
         return (shape,) + first[1:]
 
     def tolist(self):
-        return self._rdd.flatMap(lambda x: list(x))
+        return self._rdd.flatMap(lambda x: list(x)).collect()
 
     def toarray(self):
-        return np.array(self.tolist().collect())
+        return np.array(self.tolist())
 
     def toiter(self):
         javaiter = self._rdd._jrdd.toLocalIterator()

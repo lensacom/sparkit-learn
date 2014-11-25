@@ -140,6 +140,19 @@ class TestArrayRDD(RDDTestCase):
         assert_true(isinstance(ArrayRDD(rdd, 10), ArrayRDD))
         assert_true(isinstance(ArrayRDD(rdd, None), ArrayRDD))
 
+    def test_partitions_number(self):
+        data = np.arange(400).reshape((100, 4))
+        rdd = self.sc.parallelize(data, 4)
+        assert_equal(ArrayRDD(rdd, 5).partitions, 4)
+        assert_equal(ArrayRDD(rdd, 10).partitions, 4)
+        assert_equal(ArrayRDD(rdd, 20).partitions, 4)
+
+        data = np.arange(400).reshape((100, 4))
+        rdd = self.sc.parallelize(data, 7)
+        assert_equal(ArrayRDD(rdd, 5).partitions, 7)
+        assert_equal(ArrayRDD(rdd, 10).partitions, 7)
+        assert_equal(ArrayRDD(rdd, 20).partitions, 7)
+
     def test_blocks_number(self):
         n_partitions = 10
         n_samples = 1000
@@ -148,7 +161,6 @@ class TestArrayRDD(RDDTestCase):
         rdd = self.sc.parallelize(data, n_partitions)
 
         assert_equal(1000, ArrayRDD(rdd, False).blocks)
-
         assert_equal(10, ArrayRDD(rdd).blocks)
         assert_equal(20, ArrayRDD(rdd, 50).blocks)
         assert_equal(20, ArrayRDD(rdd, 66).blocks)
@@ -174,6 +186,33 @@ class TestArrayRDD(RDDTestCase):
         assert_true(all(np.array(shapes) == 100))
         shapes = ArrayRDD(rdd, 66).map(lambda x: x.shape[0]).collect()
         assert_true(all(np.in1d(shapes, [66, 34])))
+
+    def test_shape(self):
+        data = np.arange(4000)
+        shapes = [(1000, 4),
+                  (200, 20),
+                  (100, 40),
+                  (2000, 2)]
+        for shape in shapes:
+            rdd = self.sc.parallelize(data.reshape(shape))
+            assert_equal(ArrayRDD(rdd).shape, shape)
+
+    def test_convert_tolist(self):
+        data = np.arange(400)
+        rdd = self.sc.parallelize(data, 4)
+        X = ArrayRDD(rdd, 5)
+        assert_equal(X.tolist(), data.tolist())
+
+        data = [2, 3, 5, 1, 6, 7, 9, 9]
+        rdd = self.sc.parallelize(data, 2)
+        X = ArrayRDD(rdd)
+        assert_equal(X.tolist(), data)
+
+    def test_convert_toiter(self):
+        pass
+
+    def test_unblocking_rdd(self):
+        pass
 
     def test_get_single_item(self):
         data = np.arange(400).reshape((100, 4))
@@ -229,13 +268,22 @@ class TestArrayRDD(RDDTestCase):
 
         exp0th = np.arange(0, 20).reshape((5, 4))
         exp1st = np.arange(20, 40).reshape((5, 4))
-        exp2nd = np.arange(40, 60).reshape((5, 4))
         exp7th = np.arange(140, 160).reshape((5, 4))
         exp8th = np.arange(160, 180).reshape((5, 4))
         exp9th = np.arange(180, 200).reshape((5, 4))
+        exp18th = np.arange(360, 380).reshape((5, 4))
+        exp19th = np.arange(380, 400).reshape((5, 4))
 
         assert_array_equal(X[:1].collect(), [exp0th])
-        # assert_array_equal(X[:2].collect(), [exp0th, exp1st])
+        assert_array_equal(X[:2].collect(), [exp0th, exp1st])
+        assert_array_equal(X[18:].collect(), [exp18th, exp19th])
+        assert_array_equal(X[-1:].collect(), [exp19th])
+        assert_array_equal(X[-2:].collect(), [exp18th, exp19th])
+        assert_array_equal(X[7:10].collect(), [exp7th, exp8th, exp9th])
+        assert_array_equal(X[7:10:2].collect(), [exp7th, exp9th])
+        assert_array_equal(X[::9].collect(), [exp0th, exp9th, exp18th])
+        assert_array_equal(X[::-10].collect(), [exp19th, exp9th])
+        assert_array_equal(X[-1:1].collect(), [])
 
 
 class TestTupleRDD(RDDTestCase):
