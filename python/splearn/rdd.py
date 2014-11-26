@@ -166,17 +166,17 @@ class ArrayRDD(object):
         return (shape,) + first[1:]
 
     def tolist(self):
-        return self._rdd.flatMap(lambda x: list(x)).collect()
+        return self.flatMap(lambda x: list(x))
 
     def toarray(self):
-        return np.array(self.tolist())
+        return np.array(self.tolist().collect())
 
     def toiter(self):
         javaiter = self._rdd._jrdd.toLocalIterator()
         return self._rdd._collect_iterator_through_file(javaiter)
 
-    def unblock(self):
-        return ArrayRDD(self.tolist(), block_size=False)
+    # def unblock(self):
+    #     return ArrayRDD(self.tolist(), block_size=False)
 
     def transform(self, f):
         return self.map(f)

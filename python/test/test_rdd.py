@@ -201,12 +201,12 @@ class TestArrayRDD(RDDTestCase):
         data = np.arange(400)
         rdd = self.sc.parallelize(data, 4)
         X = ArrayRDD(rdd, 5)
-        assert_equal(X.tolist(), data.tolist())
+        assert_equal(X.tolist().collect(), data.tolist())
 
         data = [2, 3, 5, 1, 6, 7, 9, 9]
         rdd = self.sc.parallelize(data, 2)
         X = ArrayRDD(rdd)
-        assert_equal(X.tolist(), data)
+        assert_equal(X.tolist().collect(), data)
 
     def test_convert_toiter(self):
         pass

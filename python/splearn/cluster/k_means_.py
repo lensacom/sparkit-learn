@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from ..rdd import ArrayRDD, TupleRDD
+from ..rdd import ArrayRDD, DictRDD
 
 from sklearn.cluster import KMeans
 from pyspark.mllib.clustering import KMeans as MLlibKMeans
@@ -14,12 +14,10 @@ class SparkKMeans(KMeans):
         super(SparkKMeans, self).__init__(*args, **kwargs)
 
     def fit(self, Z):
-        X = Z.column(0) if isinstance(Z, TupleRDD) else Z
+        X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
         if self.init == 'k-means||':
-            if isinstance(X, ArrayRDD):
-                X = X.tolist()
             self._mllib_model = MLlibKMeans.train(
-                X,
+                X.tolist()._rdd,
                 self.n_clusters,
                 maxIterations=self.max_iter,
                 initializationMode="k-means||")
