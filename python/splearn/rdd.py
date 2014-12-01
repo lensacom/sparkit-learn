@@ -72,7 +72,8 @@ def block(rdd, block_size=None):
 
     # do different kinds of block depending on the type
     if isinstance(entry, dict):
-        return DictRDD(rdd.map(lambda x: x.items()), columns=entry.keys())
+        rdd = rdd.map(lambda x: x.values())
+        return DictRDD(rdd, entry.keys(), block_size)
     elif isinstance(entry, tuple):
         return TupleRDD(rdd, block_size)
     else:  # Fallback to array packing
@@ -165,18 +166,18 @@ class ArrayRDD(object):
         shape = self._rdd.map(lambda x: x.shape[0]).reduce(operator.add)
         return (shape,) + first[1:]
 
-    def tolist(self):
+    def unblock(self):
         return self.flatMap(lambda x: list(x))
 
+    def tolist(self):
+        return self.unblock().collect()
+
     def toarray(self):
-        return np.array(self.tolist().collect())
+        return np.array(self.unblock().collect())
 
     def toiter(self):
         javaiter = self._rdd._jrdd.toLocalIterator()
         return self._rdd._collect_iterator_through_file(javaiter)
-
-    # def unblock(self):
-    #     return ArrayRDD(self.tolist(), block_size=False)
 
     def transform(self, f):
         return self.map(f)
