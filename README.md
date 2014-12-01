@@ -68,7 +68,7 @@ Sparkit-learn introduce two important distributed data format:
 
 - __DictRDD:__
 
-	A column based data format, each row is a _numpy.array_.
+	A column based data format, each column is a _numpy.array_.
 	```python
 	from splearn.rdd import DictRDD
 
