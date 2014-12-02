@@ -289,7 +289,7 @@ class ArrayRDD(object):
         """Returns the data as iterable from each partition.
         """
         javaiter = self._rdd._jrdd.toLocalIterator()
-        return self._rdd._collect_iterattor_through_file(javaiter)
+        return self._rdd._collect_iterator_through_file(javaiter)
 
     def transform(self, f):
         """Equivalent to map, compatibility purpose only.
