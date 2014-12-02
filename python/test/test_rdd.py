@@ -285,7 +285,7 @@ class TestArrayRDD(RDDTestCase):
         assert_array_equal(X[[1, -2]].collect(), [exp1st, exp18th])
         assert_array_equal(X[[7, 0]].collect(), [exp7th, exp0th])
         assert_array_equal(X[[1, 2, 7, 19]].collect(),
-                          [exp1st, exp2nd, exp7th, exp19th])
+                           [exp1st, exp2nd, exp7th, exp19th])
 
     def test_array_slice_syntax(self):
         data = np.arange(400).reshape((100, 4))
@@ -343,6 +343,19 @@ class TestTupleRDD(RDDTestCase):
         assert_is_instance(TupleRDD(rdd, None), TupleRDD)
         assert_is_instance(TupleRDD(rdd), ArrayRDD)
 
+    def test_shape(self):
+        data = np.arange(4000)
+        shapes = [(1000, 4),
+                  (200, 20),
+                  (100, 40),
+                  (2000, 2)]
+        for shape in shapes:
+            rdd = self.sc.parallelize(data.reshape(shape))
+            rdd1 = rdd.zipWithIndex()
+            rdd2 = rdd.map(lambda x: (x, 1, 2, 3, 4, True))
+            assert_equal(TupleRDD(rdd1).shape, (shape[0], 2))
+            assert_equal(TupleRDD(rdd2).shape, (shape[0], 6))
+
     def test_get_single_tuple(self):
         x, y = np.arange(80).reshape((40, 2)), np.arange(40)
         x_rdd = self.sc.parallelize(x, 2)
@@ -361,6 +374,25 @@ class TestTupleRDD(RDDTestCase):
         expected = np.arange(70, 80).reshape((5, 2)), np.arange(35, 40)
         for tpl in [z.ix(7).first(), z[7].first(), z[-1].first()]:
             assert_equal_tuple(tpl, expected)
+
+    def test_get_single_item(self):
+        x, y = np.arange(80).reshape((40, 2)), np.arange(40)
+        x_rdd = self.sc.parallelize(x, 2)
+        y_rdd = self.sc.parallelize(y, 2)
+        z_rdd = x_rdd.zip(y_rdd)
+        z = TupleRDD(z_rdd, 5)
+
+        assert_array_equal(z[0, 0].first(), np.arange(0, 10).reshape((5, 2)))
+        assert_array_equal(z[0, 1].first(), np.arange(5))
+
+        assert_array_equal(z[3, 0].first(), np.arange(30, 40).reshape((5, 2)))
+        assert_array_equal(z[3, 1].first(), np.arange(15, 20))
+        assert_array_equal(z[3, -1].first(), np.arange(15, 20))
+
+        assert_array_equal(z[7, 0].first(), np.arange(70, 80).reshape((5, 2)))
+        assert_array_equal(z[-1, 0].first(), np.arange(70, 80).reshape((5, 2)))
+        assert_array_equal(z[7, 1].first(), np.arange(35, 40))
+        assert_array_equal(z[-1, -1].first(), np.arange(35, 40))
 
     def test_get_multiple_tuples(self):
         x, y = np.arange(80).reshape((40, 2)), np.arange(40)
@@ -389,24 +421,27 @@ class TestTupleRDD(RDDTestCase):
         assert_equal_multiple_tuples(z[[5, 7, 6]].collect(),
                                      [expected[0], expected[2], expected[1]])
 
-    def test_get_single_tuple_item(self):
+    def test_get_multiple_items(self):
         x, y = np.arange(80).reshape((40, 2)), np.arange(40)
         x_rdd = self.sc.parallelize(x, 2)
         y_rdd = self.sc.parallelize(y, 2)
         z_rdd = x_rdd.zip(y_rdd)
         z = TupleRDD(z_rdd, 5)
 
-        assert_array_equal(z[0, 0].first(), np.arange(0, 10).reshape((5, 2)))
-        assert_array_equal(z[0, 1].first(), np.arange(5))
-
-        assert_array_equal(z[3, 0].first(), np.arange(30, 40).reshape((5, 2)))
-        assert_array_equal(z[3, 1].first(), np.arange(15, 20))
-        assert_array_equal(z[3, -1].first(), np.arange(15, 20))
-
-        assert_array_equal(z[7, 0].first(), np.arange(70, 80).reshape((5, 2)))
-        assert_array_equal(z[-1, 0].first(), np.arange(70, 80).reshape((5, 2)))
-        assert_array_equal(z[7, 1].first(), np.arange(35, 40))
-        assert_array_equal(z[-1, -1].first(), np.arange(35, 40))
+        expected = [(np.arange(0, 10).reshape((5, 2)), np.arange(0, 5)),
+                    (np.arange(10, 20).reshape((5, 2)), np.arange(5, 10))]
+        assert_array_equal(z[:2, 1].collect(),
+                           [expected[0][1], expected[1][1]])
+        assert_array_equal(z[[0, 1], 0].collect(),
+                           [expected[0][0], expected[1][0]])
+        assert_equal_multiple_tuples(z[[0, 1], -1:].collect(),
+                                     [(expected[0][1],),
+                                      (expected[1][1],)])
+        assert_equal_multiple_tuples(z[[0, 1], -1:].collect(),
+                                     [(expected[0][1],),
+                                      (expected[1][1],)])
+        assert_equal_multiple_tuples(z[[1, 0], [1, 0]].collect(),
+                                     [expected[1][::-1], expected[0][::-1]])
 
 
 class TestDictRDD(RDDTestCase):
