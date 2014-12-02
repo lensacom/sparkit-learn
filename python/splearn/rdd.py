@@ -63,6 +63,11 @@ def block(rdd, block_size=None):
         Size of each block (number of elements), if None all data points
         from each partition will be combined in a block.
 
+    Returns
+    -------
+
+    rdd : ArrayRDD or TupleRDD or DictRDD
+        The transformed rdd with added functionality
     """
     try:
         entry = rdd.first()
@@ -83,7 +88,49 @@ def block(rdd, block_size=None):
 # TODO: cache shape etc.
 
 class ArrayRDD(object):
+    """A distributed array data structure.
 
+    Stores distributed numpy.arrays. It provides a transparent interface to the
+    underlying pyspark.rdd.RDD and also extends it with numpy.array like methods.
+
+    Parameters
+    ----------
+    rdd : pyspark.rdd.RDD
+        A parallelized data container
+    block_size : {int, None, False} default to None
+        The number of entries to block together. If None one block will be
+        created in every partition. If False, no blocking executed. Useful when
+        casting already blocked rdds.
+
+    Attributes
+    ----------
+    partitions : int
+        The number of partitions in the rdd
+    blocks : int
+        The number of blocks present in the rdd
+    shape : tuple
+        The dimensionality of the dataset
+    _rdd : pyspark.rdd.RDD
+        The underlying distributed data container
+
+    Examples
+    --------
+    >>> from splearn.rdd import ArrayRDD
+    >>> rdd = sc.parallelize(range(20), 2)
+    >>> X = ArrayRDD(rdd, block_size=5)
+    >>> X
+    <class 'splearn.rdd.ArrayRDD'> from PythonRDD...
+
+    >>> X.collect()
+    [array([0, 1, 2, 3, 4]),
+     array([5, 6, 7, 8, 9]),
+     array([10, 11, 12, 13, 14]),
+     array([15, 16, 17, 18, 19])]
+
+    >>> X[:-1:2].collect()
+    [array([0, 1, 2, 3, 4]), array([10, 11, 12, 13, 14])]
+
+    """
     def __init__(self, rdd, block_size=None):
         self.block_size = block_size
         if isinstance(rdd, ArrayRDD):
@@ -98,9 +145,36 @@ class ArrayRDD(object):
                 "Unexpected type {0} for parameter rdd".format(type(rdd)))
 
     def _block(self, rdd, block_size):
+        """Execute the blocking process on the given rdd.
+
+        Parameters
+        ----------
+        rdd : pyspark.rdd.RDD
+            Distributed data to block
+        block_size : int or None
+            The desired size of the blocks
+
+        Returns
+        -------
+        rdd : pyspark.rdd.RDD
+            Blocked rdd.
+        """
         return rdd.mapPartitions(lambda x: _block_collection(x, block_size))
 
     def __getattr__(self, attr):
+        """Access pyspark.rdd.RDD methods or attributes.
+
+        Parameters
+        ----------
+        attr : method or attribute
+            The method/attribute to access
+
+        Returns
+        -------
+        result : method or attribute
+            The result of the requested method or attribute casted to ArrayRDD
+            if method/attribute is available, else raises AttributeError.
+        """
         def bypass(*args, **kwargs):
             result = getattr(self._rdd, attr)(*args, **kwargs)
             if isinstance(result, RDD):
@@ -116,16 +190,42 @@ class ArrayRDD(object):
         return bypass
 
     def __repr__(self):
+        """Returns a string representation of the ArrayRDD.
+        """
         return "{0} from {1}".format(self.__class__, repr(self._rdd))
 
     def __getitem__(self, key):
+        """Access a specified block.
+
+        Parameters
+        ----------
+        key : int or slice
+            The key of the block or the range of the blocks.
+
+        Returns
+        -------
+        block : ArrayRDD
+            The selected block(s).
+        """
         return self.ix(key)
 
     def __len__(self):
-        # returns number of blocks
+        """Returns the number of blocks."""
         return self.count()
 
     def ix(self, index):
+        """Returns the selected blocks defined by index parameter.
+
+        Parameter
+        ---------
+        index : int or slice
+            The key of the block or the range of the blocks.
+
+        Returns
+        -------
+        block : ArrayRDD
+            The selected block(s).
+        """
         if isinstance(index, tuple):
             raise IndexError("Too many indices for ArrayRDD")
         elif isinstance(index, slice) and index == slice(None, None, None):
@@ -152,49 +252,150 @@ class ArrayRDD(object):
 
     @property
     def partitions(self):  # numpart?
-        # returns number of partitions of rdd
+        """Returns the number of partitions in the rdd.
+        """
         return self._rdd.getNumPartitions()
 
     @property
     def blocks(self):
-        # returns number of blocks
+        """Returns the number of blocks.
+        """
         return self._rdd.count()
 
     @property
     def shape(self):
+        """Returns the shape of the data.
+        """
         first = self.first().shape
         shape = self._rdd.map(lambda x: x.shape[0]).reduce(operator.add)
         return (shape,) + first[1:]
 
     def unblock(self):
+        """Flattens the blocks.
+        """
         return self.flatMap(lambda x: list(x))
 
     def tolist(self):
+        """Returns the data as lists from each partition.
+        """
         return self.unblock().collect()
 
     def toarray(self):
+        """Returns the data as numpy.array from each partition.
+        """
         return np.array(self.unblock().collect())
 
     def toiter(self):
+        """Returns the data as iterable from each partition.
+        """
         javaiter = self._rdd._jrdd.toLocalIterator()
-        return self._rdd._collect_iterator_through_file(javaiter)
+        return self._rdd._collect_iterattor_through_file(javaiter)
 
     def transform(self, f):
+        """Equivalent to map, compatibility purpose only.
+        """
         return self.map(f)
 
 
 class TupleRDD(ArrayRDD):
+    """Distributed tuple data structure.
+
+    The tuple is stored as a tuple of numpy.arrays in each block. It works like
+    a column based data structure, each column can be transformed and accessed
+    independently.
+
+    Parameters
+    ----------
+    rdd : pyspark.rdd.RDD
+        A parallelized data container
+    block_size : {int, None, False} default to None
+        The number of entries to block together. If None, one block will be
+        created in every partition. If False, no blocking executed. Useful when
+        casting already blocked rdds.
+
+    Attributes
+    ----------
+    columns : int
+        Number of columns in the rdd
+    partitions : int
+        The number of partitions in the rdd
+    blocks : int
+        The number of blocks present in the rdd
+    shape : tuple
+        The dimensionality of the dataset
+    _rdd : pyspark.rdd.RDD
+        The underlying distributed data container
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from splearn.rdd import TupleRDD
+    >>> data = np.array([range(20), range(2)*10])
+    >>> Z = TupleRDD(sc.parallelize(data.T), block_size=5)
+    >>> Z
+    <class 'splearn.rdd.TupleRDD'> from PythonRDD...
+
+    >>> Z.collect()
+    [(array([0, 1, 2, 3, 4]), array([0, 1, 0, 1, 0])),
+     (array([5, 6, 7, 8, 9]), array([1, 0, 1, 0, 1])),
+     (array([10, 11, 12, 13, 14]), array([0, 1, 0, 1, 0])),
+     (array([15, 16, 17, 18, 19]), array([1, 0, 1, 0, 1]))]
+
+    >>> Z.columns
+    2
+
+    >>> Z[1:-1, 0].collect()
+    [array([5, 6, 7, 8, 9]), array([10, 11, 12, 13, 14])]
+    """
 
     def _block(self, rdd, block_size):
+        """Execute the blocking process on the given rdd.
+
+        Parameters
+        ----------
+        rdd : pyspark.rdd.RDD
+            Distributed data to block
+        block_size : int or None
+            The desired size of the blocks
+
+        Returns
+        -------
+        rdd : pyspark.rdd.RDD
+            Blocked rdd.
+        """
         return rdd.mapPartitions(lambda x: _block_tuple(x, block_size))
 
     def __getitem__(self, key):
+        """Access a specified block.
+
+        Parameters
+        ----------
+        key : int or slice
+            The key of the block or the range of the blocks.
+
+        Returns
+        -------
+        block : ArrayRDD or TupleRDD
+            The selected block(s).
+        """
         if isinstance(key, tuple):  # get first index
             index, key = key
             return self.ix(index).get(key)
         return self.ix(key)
 
     def ix(self, index):
+        """Returns the selected blocks defined by index parameter.
+
+        Parameter
+        ---------
+        index : int or slice
+            The key of the block or the range of the blocks.
+
+        Returns
+        -------
+        block : TupleRDD
+            The selected block(s).
+        """
         return TupleRDD(super(TupleRDD, self).ix(index))
 
     def get(self, key):
@@ -215,13 +416,33 @@ class TupleRDD(ArrayRDD):
 
     @property
     def columns(self):
+        """Returns the number of columns.
+        """
         return len(self.first())
 
     @property
     def shape(self):
+        """Returns the shape of the data.
+        """
         return (self.get(0).shape[0], self.columns)
 
     def transform(self, f, column=None):
+        """Execute a transformation on a column or columns. Returns the modified
+        TupleRDD.
+
+        Parameters
+        ----------
+        f : function
+            The function to execute on the columns.
+        column : {int, list or None}
+            The column(s) to transform. If None is specified the method is
+            equivalent to map.
+
+        Returns
+        -------
+        result : TupleRDD
+            TupleRDD with transformed column(s).
+        """
         if column is not None:
             mapper = lambda x: x[:column] + (f(x[column]),) + x[column + 1:]
         else:
@@ -230,6 +451,61 @@ class TupleRDD(ArrayRDD):
 
 
 class DictRDD(TupleRDD):
+    """Distributed named tuple data structure.
+
+    The tuple is stored as a tuple of numpy.arrays in each block. It works like
+    a column based data structure, each column can be transformed and accessed
+    independently and identified by a column name. Very useful for training:
+    In splearn the fit methods expects a DictRDD with 'X', 'y' and an optional
+    'w' columns.
+        'X' - training data,
+        'y' - labels,
+        'w' - weights
+
+
+    Parameters
+    ----------
+    rdd : pyspark.rdd.RDD
+        A parallelized data container
+    block_size : {int, None, False} default to None
+        The number of entries to block together. If None, one block will be
+        created in every partition. If False, no blocking executed. Useful when
+        casting already blocked rdds.
+
+    Attributes
+    ----------
+    columns : tuple
+        Name of columns in the rdd as a tuple
+    partitions : int
+        The number of partitions in the rdd
+    blocks : int
+        The number of blocks present in the rdd
+    shape : tuple
+        The dimensionality of the dataset
+    _rdd : pyspark.rdd.RDD
+        The underlying distributed data container
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from splearn.rdd import DictRDD
+    >>> data = np.array([range(20), range(2)*10])
+    >>> Z = DictRDD(sc.parallelize(data.T), columns=('X', 'y'), block_size=5)
+    >>> Z
+    <class 'splearn.rdd.DictRDD'> from PythonRDD...
+
+    >>> Z.collect()
+    [(array([0, 1, 2, 3, 4]), array([0, 1, 0, 1, 0])),
+     (array([5, 6, 7, 8, 9]), array([1, 0, 1, 0, 1])),
+     (array([10, 11, 12, 13, 14]), array([0, 1, 0, 1, 0])),
+     (array([15, 16, 17, 18, 19]), array([1, 0, 1, 0, 1]))]
+
+    >>> Z.columns
+    ('X', 'y')
+
+    >>> Z[1:-1, 'X'].collect()
+    [array([5, 6, 7, 8, 9]), array([10, 11, 12, 13, 14])]
+    """
 
     def __init__(self, rdd, columns, block_size=None):
         super(DictRDD, self).__init__(rdd, block_size)
@@ -244,6 +520,18 @@ class DictRDD(TupleRDD):
         self._cols = tuple(columns)  # TODO: unique
 
     def ix(self, index):
+        """Returns the selected blocks defined by index parameter.
+
+        Parameter
+        ---------
+        index : int or slice
+            The key of the block or the range of the blocks.
+
+        Returns
+        -------
+        block : DictRDD
+            The selected block(s).
+        """
         return DictRDD(super(DictRDD, self).ix(index), columns=self._cols)
 
     def get(self, key):
@@ -265,13 +553,33 @@ class DictRDD(TupleRDD):
 
     @property
     def columns(self):
+        """Returns the name of the columns.
+        """
         return self._cols
 
     @property
     def shape(self):
+        """Returns the shape of the data.
+        """
         return (super(DictRDD, self).get(0).shape[0], self.columns)
 
     def transform(self, f, column=None):
+        """Execute a transformation on a column or columns. Returns the modified
+        DictRDD.
+
+        Parameters
+        ----------
+        f : function
+            The function to execute on the columns.
+        column : {str, list or None}
+            The column(s) to transform. If None is specified the method is
+            equivalent to map.
+
+        Returns
+        -------
+        result : DictRDD
+            DictRDD with transformed column(s).
+        """
         if column is not None:
             column = self._cols.index(column)
         transformed = super(DictRDD, self).transform(f, column)
