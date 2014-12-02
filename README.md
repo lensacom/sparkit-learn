@@ -16,7 +16,7 @@ accomodate this conception, the basic data block is always an array or a
 
 # Quick start
 
-Sparkit-learn introduce two important distributed data format:
+Sparkit-learn introduces two important distributed data format:
 
 - __ArrayRDD:__
 
@@ -32,7 +32,7 @@ Sparkit-learn introduce two important distributed data format:
 	# each partition will contain blocks with 5 elements
 	X = ArrayRDD(rdd, block_size=5) # 4 blocks, 2 in each partition
 	```
-	Some basic operation:
+	Basic operations:
 	```python
 	len(X) # 4 - number of blocks
 	X.shape # (20,) - the shape of the whole dataset
@@ -58,9 +58,9 @@ Sparkit-learn introduce two important distributed data format:
 	X[1::2] # returns an ArrayRDD as well
 
 	X.tolist() # returns the dataset as a list
-	# [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+	# [0, 1, 2, ... 17, 18, 19]
 	X.toarray() # returns the dataset as a numpy.array
-	# array([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
+	# array([ 0,  1,  2, ... 17, 18, 19])
 
 	# pyspark.rdd operations will still work
 	X.numPartitions() # 2 - number of partitions
@@ -80,7 +80,7 @@ Sparkit-learn introduce two important distributed data format:
 	zipped_rdd = X_rdd.zip(y_rdd) # zip the two rdd's together
 	# DictRDD
 	# each partition will contain blocks with 5 elements
-	Z = DictRDD(zipped_rdd, columns=('X', 'y'),  block_size=5) # 4 blocks, 2 in each partition
+	Z = DictRDD(zipped_rdd, columns=('X', 'y'),  block_size=5) # 4 blocks, 2/partition
 
 	# or:
 	import numpy as np
@@ -93,6 +93,7 @@ Sparkit-learn introduce two important distributed data format:
 	```python
 	len(Z) # 4 - number of blocks
 	Z.shape # (20,2) - the shape of the whole dataset
+	Z.columns # returns ('X', 'y')
 
 	Z # returns a DictRDD
 	#<class 'splearn.rdd.DictRDD'> from PythonRDD...
@@ -103,7 +104,7 @@ Sparkit-learn introduce two important distributed data format:
 	#  (array([10, 11, 12, 13, 14]), array([0, 1, 0, 1, 0])),
 	#  (array([15, 16, 17, 18, 19]), array([1, 0, 1, 0, 1]))]
 
-	Z[:, 'y'] # column select - returns a DictRDD
+	Z[:, 'y'] # column select - returns an ArrayRDD
 	Z[:, 'y'].collect()
 	# [array([0, 1, 0, 1, 0]),
 	#  array([1, 0, 1, 0, 1]),
@@ -117,12 +118,14 @@ Sparkit-learn introduce two important distributed data format:
 	#  (array([10, 11, 12, 13, 14]), array([0, 1, 0, 1, 0]))]
 	```
 
+## Basic workflow
 
-The basic workflow is almost identical to sklearn's:
+With the use of the aformentioned data structures, the basic workflow is almost identical to sklearn's.
 
-## Distributed vectorizing of texts
 
-### SparkCountVectorizer
+### Distributed vectorizing of texts
+
+#### SparkCountVectorizer
 
 ```python
 from splearn.rdd import ArrayRDD
@@ -139,7 +142,7 @@ result_local = local.fit_transform(X)
 result_dist = dist.fit_transform(X_rdd)  # ArrayRDD
 ```
 
-### SparkHashingVectorizer
+#### SparkHashingVectorizer
 
 ```python
 from splearn.rdd import ArrayRDD
@@ -156,7 +159,7 @@ result_local = local.fit_transform(X)
 result_dist = dist.fit_transform(X_rdd)  # ArrayRDD
 ```
 
-### SparkTfidfTransformer
+#### SparkTfidfTransformer
 
 ```python
 from splearn.rdd import ArrayRDD
@@ -184,7 +187,7 @@ result_local = local_pipeline.fit_transform(X)
 result_dist = dist_pipeline.fit_transform(X_rdd)  # ArrayRDD
 ```
 
-## Distributed Classifiers
+### Distributed Classifiers
 
 ```python
 from splearn.rdd import DictRDD
@@ -222,7 +225,7 @@ y_pred_local = local_pipeline.predict(X)
 y_pred_dist = dist_pipeline.predict(Z[:, 'X'])
 ```
 
-## Distributed Model Selection
+### Distributed Model Selection
 
 ```python
 from splearn.rdd import DictRDD
