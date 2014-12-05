@@ -5,9 +5,9 @@ from sklearn.externals import six
 
 
 class SparkPipeline(Pipeline):
-     """Distributed implementation of sklearn's pipeline node.
+    """Distributed implementation of sklearn's pipeline node.
 
-     Pipeline of transforms with a final estimator.
+    Pipeline of transforms with a final estimator.
 
     Sequentially apply a list of transforms and a final estimator.
     Intermediate steps of the pipeline must be 'transforms', that is, they
