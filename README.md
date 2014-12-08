@@ -219,7 +219,7 @@ dist_pipeline = Pipeline((
 ))
 
 local_pipeline.fit(X, y)
-dist_pipeline.fit(Z, classes=np.unique(Z[:, 'y']))
+dist_pipeline.fit(Z, classes=np.unique(y))
 
 y_pred_local = local_pipeline.predict(X)
 y_pred_dist = dist_pipeline.predict(Z[:, 'X'])
