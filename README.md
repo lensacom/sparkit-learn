@@ -276,3 +276,6 @@ We would like to thank to:
  - scikit-learn community
  - spylearn community
  - pyspark community
+
+
+[![Analytics](https://ga-beacon.appspot.com/UA-57495026-1/sparkit-learn/readme?pixel)](https://github.com/lensacom/sparkit-learn)
