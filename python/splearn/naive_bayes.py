@@ -2,13 +2,13 @@
 
 import numpy as np
 from sklearn.base import copy
-from sklearn.naive_bayes import BaseNB
-from sklearn.naive_bayes import BaseDiscreteNB, GaussianNB
-from sklearn.naive_bayes import MultinomialNB, BernoulliNB
-
+from sklearn.naive_bayes import (BaseDiscreteNB, BaseNB, BernoulliNB,
+                                 GaussianNB, MultinomialNB)
 from splearn.base import SparkClassifierMixin
 
+
 class SparkBaseNB(BaseNB, SparkClassifierMixin):
+
     """Abstract base class for distributed naive Bayes estimators"""
 
     def __radd__(self, other):
@@ -69,6 +69,7 @@ class SparkBaseNB(BaseNB, SparkClassifierMixin):
 
 
 class SparkGaussianNB(GaussianNB, SparkBaseNB):
+
     """
     Distributed Gaussian Naive Bayes (SparkGaussianNB)
 
@@ -136,7 +137,7 @@ class SparkGaussianNB(GaussianNB, SparkBaseNB):
 
             mu_xy = N_x * mu_x + N_y * mu_y
             sigma_xy = (sigma_x * N_x + sigma_y * N_y +
-                       (N_x * N_y * (mu_x - mu_y)**2) / N_total)
+                        (N_x * N_y * (mu_x - mu_y) ** 2) / N_total)
 
             this.theta_[i, :] = mu_xy / N_total
             this.sigma_[i, :] = sigma_xy / N_total
@@ -147,6 +148,7 @@ class SparkGaussianNB(GaussianNB, SparkBaseNB):
 
 
 class SparkBaseDiscreteNB(BaseDiscreteNB, SparkBaseNB):
+
     """
     Abstract base class for distributed naive Bayes on discrete/categorical
     data. It provides the necessary methods for model averaging.
@@ -213,4 +215,3 @@ class SparkMultinomialNB(MultinomialNB, SparkBaseDiscreteNB):
 
 class SparkBernoulliNB(BernoulliNB, SparkBaseDiscreteNB):
     pass
-
