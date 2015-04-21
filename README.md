@@ -6,7 +6,7 @@ __PySpark + Scikit-learn = Sparkit-learn__
 
 # About
 
-Sparkit-learn is an experimental repository for providing scikit-learn
+Sparkit-learn is an experimental repository which aims to provide scikit-learn
 functionality and API on PySpark. The main goal of the library is to
 create an API that stays close to sklearn's.
 
