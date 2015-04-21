@@ -6,12 +6,12 @@ __PySpark + Scikit-learn = Sparkit-learn__
 
 # About
 
-Sparkit-learn is an experimental repository for supporting scikit-learn
+Sparkit-learn is an experimental repository for providing scikit-learn
 functionality and API on PySpark. The main goal of the library is to
 create an API that stays close to sklearn's.
 
-The driving principal was to _"Think locally, execute distributively."_ To
-accomodate this conception, the basic data block is always an array or a
+The driving principle was to _"Think locally, execute distributively."_ To
+accomodate this concept, the basic data block is always an array or a
 (sparse) matrix and the operations are executed on block level.
 
 # Quick start
@@ -120,7 +120,8 @@ Sparkit-learn introduces two important distributed data format:
 
 ## Basic workflow
 
-With the use of the aformentioned data structures, the basic workflow is almost identical to sklearn's.
+With the use of the described data structures, the basic workflow is almost
+identical to sklearn's.
 
 
 ### Distributed vectorizing of texts
