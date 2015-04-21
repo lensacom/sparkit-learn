@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 
-from pyspark.rdd import RDD
+import operator
 
 import numpy as np
 import scipy.sparse as sp
-import operator
-# from copy import copy
+from pyspark.rdd import RDD
 
 
 def _pack_accumulated(accumulated):
@@ -85,13 +84,13 @@ def block(rdd, block_size=None):
         return ArrayRDD(rdd, block_size)
 
 
-# TODO: cache shape etc.
-
 class ArrayRDD(object):
+
     """A distributed array data structure.
 
     Stores distributed numpy.arrays. It provides a transparent interface to the
-    underlying pyspark.rdd.RDD and also extends it with numpy.array like methods.
+    underlying pyspark.rdd.RDD and also extends it with numpy.array like
+    methods.
 
     Parameters
     ----------
@@ -131,6 +130,7 @@ class ArrayRDD(object):
     [array([0, 1, 2, 3, 4]), array([10, 11, 12, 13, 14])]
 
     """
+
     def __init__(self, rdd, block_size=None):
         self.block_size = block_size
         if isinstance(rdd, ArrayRDD):
@@ -298,6 +298,7 @@ class ArrayRDD(object):
 
 
 class TupleRDD(ArrayRDD):
+
     """Distributed tuple data structure.
 
     The tuple is stored as a tuple of numpy.arrays in each block. It works like
@@ -451,6 +452,7 @@ class TupleRDD(ArrayRDD):
 
 
 class DictRDD(TupleRDD):
+
     """Distributed named tuple data structure.
 
     The tuple is stored as a tuple of numpy.arrays in each block. It works like
