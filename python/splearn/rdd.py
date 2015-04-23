@@ -285,12 +285,6 @@ class ArrayRDD(object):
         """
         return np.array(self.unblock().collect())
 
-    def toiter(self):
-        """Returns the data as iterable from each partition.
-        """
-        javaiter = self._rdd._jrdd.toLocalIterator()
-        return self._rdd._collect_iterator_through_file(javaiter)
-
     def transform(self, f):
         """Equivalent to map, compatibility purpose only.
         """

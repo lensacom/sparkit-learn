@@ -1,20 +1,14 @@
 import shutil
 import tempfile
+
 import numpy as np
 import scipy.sparse as sp
-import collections
-
-from nose.tools import assert_true
-from nose.tools import assert_raises
-from nose.tools import assert_equal
-from nose.tools import assert_is_instance
+from common import SplearnTestCase
+from nose.tools import (assert_equal, assert_is_instance, assert_raises,
+                        assert_true)
 from numpy.testing import assert_array_equal
 from sklearn.utils.testing import assert_array_almost_equal
-
-from common import SplearnTestCase
-
-from splearn.rdd import block
-from splearn.rdd import ArrayRDD, TupleRDD, DictRDD
+from splearn.rdd import ArrayRDD, TupleRDD, block
 
 
 def assert_equal_tuple(tpl1, tpl2):
@@ -63,8 +57,8 @@ class TestBlockRDD(RDDTestCase):
 
         tuple_blocks = blocked_data.collect()
         assert_equal(len(tuple_blocks), n_partitions)
-        assert_equal(sum(len(b[0]) for b in tuple_blocks),  n_samples)
-        assert_equal(sum(len(b[1]) for b in tuple_blocks),  n_samples)
+        assert_equal(sum(len(b[0]) for b in tuple_blocks), n_samples)
+        assert_equal(sum(len(b[1]) for b in tuple_blocks), n_samples)
 
     def test_block_rdd_sp_matrix(self):
         n_partitions = 10
@@ -89,7 +83,7 @@ class TestBlockRDD(RDDTestCase):
         blocks = blocked_data.collect()
         assert_equal(len(blocks), n_partitions)
         assert_array_almost_equal(np.ones((10, 1)), blocks[-1])
-        assert_equal(sum(len(b) for b in blocks),  n_samples)
+        assert_equal(sum(len(b) for b in blocks), n_samples)
 
         n_partitions = 17
         data = self.sc.parallelize([np.array([1]) for i in range(n_samples)],
@@ -99,7 +93,7 @@ class TestBlockRDD(RDDTestCase):
                                   blocked_data.first())
         blocks = blocked_data.collect()
         assert_equal(len(blocks), n_partitions)
-        assert_equal(sum(len(b) for b in blocks),  n_samples)
+        assert_equal(sum(len(b) for b in blocks), n_samples)
 
     def test_block_rdd_array_block_size(self):
         n_partitions = 10
@@ -118,8 +112,7 @@ class TestBlockRDD(RDDTestCase):
     def test_block_empty_rdd(self):
         n_partitions = 3
         empty_data = self.sc.parallelize([], n_partitions)
-        blocks = block(empty_data).collect()
-        assert_equal(len(blocks), 0)
+        assert_raises(ValueError, block, empty_data)
 
     def test_block_rdd_dict(self):
         n_partitions = 3
@@ -231,14 +224,6 @@ class TestArrayRDD(RDDTestCase):
         X_list = X.tolist()
         assert_is_instance(X_list, list)
         assert_equal(X_list, data)
-
-    def test_convert_toiter(self):
-        data = np.arange(40)
-        rdd = self.sc.parallelize(data, 4)
-        X = ArrayRDD(rdd, 5)
-        X_iter = X.toiter()
-        assert_is_instance(X_iter, collections.Iterator)
-        assert_array_equal(list(X_iter), X.collect())
 
     def test_get_single_item(self):
         data = np.arange(400).reshape((100, 4))

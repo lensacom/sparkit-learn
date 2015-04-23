@@ -7,14 +7,14 @@ virtualenv:
   system_site_packages: true
 install:
   # Install Spark
-  - wget http://d3kbcqa49mib13.cloudfront.net/spark-1.1.0-bin-hadoop2.4.tgz
-  - tar -xzf spark-1.1.0-bin-hadoop2.4.tgz
+  - wget http://d3kbcqa49mib13.cloudfront.net/spark-1.3.1-bin-hadoop2.4.tgz
+  - tar -xzf spark-1.3.1-bin-hadoop2.4.tgz
   - sudo apt-get install -qq python-numpy python-scipy python-pandas python-sklearn
   - travis_wait pip install -r python/requirements.txt
   # Workaround for Travis issue with POSIX semaphores; see
   # https://github.com/travis-ci/travis-cookbooks/issues/155
   - "sudo rm -rf /dev/shm && sudo ln -s /run/shm /dev/shm"
 script:
-    - export SPARK_HOME=`pwd`/spark-1.1.0-bin-hadoop2.4
+    - export SPARK_HOME=`pwd`/spark-1.3.1-bin-hadoop2.4
     - cd python/test
     - ./run_tests.sh

@@ -10,22 +10,6 @@ object RootBuild extends Build {
   val ScalaVersion = "2.10.4"
   val Version = "0.0.1-SNAPSHOT"
 
-  lazy val dictVectorizer = Project(
-    id="dict-vectorizer",
-    base=file("dict-vectorizer"),
-    settings = assemblySettings ++ Seq(
-      organization := Organization,
-      name := "dict-vectorizer",
-      version := Version,
-      scalaVersion := ScalaVersion,
-      libraryDependencies ++= Seq(
-	"org.scalatest" % "scalatest_2.10" % "2.2.0" % "test",
-	"org.apache.spark" %% "spark-core" % "1.1.0" % "provided",
-	"org.apache.spark" %% "spark-mllib" % "1.1.0" % "provided"
-      )
-    ) ++ ScalastylePlugin.Settings
-  )
-
   lazy val sparkDbscan = RootProject(
     uri("https://github.com/lesbroot/spark_dbscan.git#4fe5c23c7ec06c9af8822e9ad03d70cf6f7bf73b")
   )
