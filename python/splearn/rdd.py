@@ -285,10 +285,16 @@ class ArrayRDD(object):
         """
         return np.array(self.unblock().collect())
 
+    def tosparse(self):
+        return sp.vstack(self.collect())
+
     def transform(self, f):
         """Equivalent to map, compatibility purpose only.
         """
         return self.map(f)
+
+    def cartesian(self, other):
+        return TupleRDD(self._rdd.cartesian(other._rdd), False)
 
 
 class TupleRDD(ArrayRDD):
@@ -421,6 +427,24 @@ class TupleRDD(ArrayRDD):
         """
         return (self.get(0).shape[0], self.columns)
 
+    def unblock(self):
+        """Flattens the blocks.
+        """
+        return self.flatMap(lambda cols: zip(*cols))
+
+    def tolist(self):
+        """Returns the data as lists from each partition.
+        """
+        return self.unblock().collect()
+
+    def toarray(self):
+        """Returns the data as numpy.array from each partition.
+        """
+        return np.array(self.unblock().collect())
+
+    def tosparse(self):
+        raise NotImplementedError("Ambigious in case of multiple columns.")
+
     def transform(self, f, column=None):
         """Execute a transformation on a column or columns. Returns the modified
         TupleRDD.
@@ -443,6 +467,9 @@ class TupleRDD(ArrayRDD):
         else:
             mapper = f
         return TupleRDD(self.map(mapper))
+
+    def cartesian(self, other):
+        return TupleRDD(self._rdd.cartesian(other._rdd), False)
 
 
 class DictRDD(TupleRDD):

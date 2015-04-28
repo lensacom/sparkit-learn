@@ -2,6 +2,9 @@ from operator import add
 
 import numpy as np
 import scipy.linalg as ln
+from sklearn.decomposition import TruncatedSVD
+
+from ..rdd import ArrayRDD, DictRDD
 
 
 def svd(blocked_rdd, k):
@@ -44,7 +47,7 @@ def svd(blocked_rdd, k):
     return u, s, v
 
 
-def svd_em(blocked_rdd, k, maxiter=20, tol=1e-5, seed=None):
+def svd_em(blocked_rdd, k, maxiter=20, tol=1e-6, seed=None):
     """
     Calculate the SVD of a blocked RDD using an expectation maximization
     algorithm (from Roweis, NIPS, 1997) that avoids explicitly
@@ -121,6 +124,174 @@ def svd_em(blocked_rdd, k, maxiter=20, tol=1e-5, seed=None):
     inds = np.argsort(w)[::-1]
     s = np.sqrt(w[inds[0:k]]) * np.sqrt(n)
     v = np.dot(v[:, inds[0:k]].T, c)
-    u = blocked_rdd.map(lambda x: np.inner(x, v) / s)
+    u = ArrayRDD(blocked_rdd.map(lambda x: np.inner(x, v) / s))
 
     return u, s, v
+
+
+class SparkTruncatedSVD(TruncatedSVD):
+
+    """Dimensionality reduction using truncated SVD (aka LSA).
+
+    This transformer performs linear dimensionality reduction by means of
+    truncated singular value decomposition (SVD). It is very similar to PCA,
+    but operates on sample vectors directly, instead of on a covariance matrix.
+    This means it can work with scipy.sparse matrices efficiently.
+
+    In particular, truncated SVD works on term count/tf-idf matrices as
+    returned by the vectorizers in sklearn.feature_extraction.text. In that
+    context, it is known as latent semantic analysis (LSA).
+
+    This estimator supports two algorithm: a fast randomized SVD solver, and
+    a "naive" algorithm that uses ARPACK as an eigensolver on (X * X.T) or
+    (X.T * X), whichever is more efficient.
+
+    Parameters
+    ----------
+    n_components : int, default = 2
+        Desired dimensionality of output data.
+        Must be strictly less than the number of features.
+        The default value is useful for visualisation. For LSA, a value of
+        100 is recommended.
+
+    algorithm : string, default = "randomized"
+        SVD solver to use. Either "arpack" for the ARPACK wrapper in SciPy
+        (scipy.sparse.linalg.svds), or "randomized" for the randomized
+        algorithm due to Halko (2009).
+
+    n_iter : int, optional
+        Number of iterations for randomized SVD solver. Not used by ARPACK.
+
+    random_state : int or RandomState, optional
+        (Seed for) pseudo-random number generator. If not given, the
+        numpy.random singleton is used.
+
+    tol : float, optional
+        Tolerance for ARPACK. 0 means machine precision. Ignored by randomized
+        SVD solver.
+
+    Attributes
+    ----------
+    components_ : array, shape (n_components, n_features)
+
+    explained_variance_ratio_ : array, [n_components]
+        Percentage of variance explained by each of the selected components.
+
+    explained_variance_ : array, [n_components]
+        The variance of the training samples transformed by a projection to
+        each component.
+
+    Examples
+    --------
+    >>> from sklearn.decomposition import TruncatedSVD
+    >>> from sklearn.random_projection import sparse_random_matrix
+    >>> X = sparse_random_matrix(100, 100, density=0.01, random_state=42)
+    >>> svd = TruncatedSVD(n_components=5, random_state=42)
+    >>> svd.fit(X) # doctest: +NORMALIZE_WHITESPACE
+    TruncatedSVD(algorithm='randomized', n_components=5, n_iter=5,
+            random_state=42, tol=0.0)
+    >>> print(svd.explained_variance_ratio_) # doctest: +ELLIPSIS
+    [ 0.07825... 0.05528... 0.05445... 0.04997... 0.04134...]
+    >>> print(svd.explained_variance_ratio_.sum()) # doctest: +ELLIPSIS
+    0.27930...
+
+    See also
+    --------
+    PCA
+    RandomizedPCA
+
+    References
+    ----------
+    Finding structure with randomness: Stochastic algorithms for constructing
+    approximate matrix decompositions
+    Halko, et al., 2009 (arXiv:909) http://arxiv.org/pdf/0909.4061
+
+    Notes
+    -----
+    SVD suffers from a problem called "sign indeterminancy", which means the
+    sign of the ``components_`` and the output from transform depend on the
+    algorithm and random state. To work around this, fit instances of this
+    class to data once, then keep the instance around to do transformations.
+
+    """
+
+    def __init__(self, n_components=2, algorithm="em", n_iter=30,
+                 random_state=None, tol=1e-7):
+        super(SparkTruncatedSVD, self).__init__(
+            n_components=n_components, algorithm=algorithm,
+            n_iter=n_iter, random_state=random_state, tol=tol)
+
+    def fit(self, Z):
+        """Fit LSI model on training data X.
+
+        Parameters
+        ----------
+        X : {array-like, sparse matrix}, shape (n_samples, n_features)
+            Training data.
+
+        Returns
+        -------
+        self : object
+            Returns the transformer object.
+        """
+        self.fit_transform(Z)
+        return self
+
+    def fit_transform(self, Z):
+        """Fit LSI model to X and perform dimensionality reduction on X.
+
+        Parameters
+        ----------
+        X : {array-like, sparse matrix}, shape (n_samples, n_features)
+            Training data.
+
+        Returns
+        -------
+        X_new : array, shape (n_samples, n_components)
+            Reduced version of X. This will always be a dense array.
+        """
+        X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
+
+        if self.algorithm == "em":
+            U, Sigma, V = svd_em(X, k=self.n_components, maxiter=self.n_iter,
+                                 tol=self.tol, seed=self.random_state)
+            self.components_ = V
+            # return transformed data
+            return U.transform(lambda x: np.dot(x, np.diag(Sigma)))
+        else:
+            # TODO: raise warning non distributed
+            return super(SparkTruncatedSVD, self).fit_transform(X.tosparse())
+
+    def transform(self, X):
+        """Perform dimensionality reduction on X.
+
+        Parameters
+        ----------
+        X : {array-like, sparse matrix}, shape (n_samples, n_features)
+            New data.
+
+        Returns
+        -------
+        X_new : array, shape (n_samples, n_components)
+            Reduced version of X. This will always be a dense array.
+        """
+        mapper = super(SparkTruncatedSVD, self).transform
+        return X.transform(mapper)
+
+    def inverse_transform(self, X):
+        """Transform X back to its original space.
+
+        Returns an array X_original whose transform would be X.
+
+        Parameters
+        ----------
+        X : array-like, shape (n_samples, n_components)
+            New data.
+
+        Returns
+        -------
+        X_original : array, shape (n_samples, n_features)
+            Note that this is always a dense array.
+        """
+        mapper = super(SparkTruncatedSVD, self).inverse_transform
+        return X.transform(mapper)

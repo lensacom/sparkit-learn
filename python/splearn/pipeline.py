@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 
-from sklearn.pipeline import Pipeline
 from sklearn.externals import six
+from sklearn.pipeline import Pipeline
 
 
 class SparkPipeline(Pipeline):
+
     """Distributed implementation of sklearn's pipeline node.
 
     Pipeline of transforms with a final estimator.
@@ -91,7 +92,7 @@ class SparkPipeline(Pipeline):
 
         Parameters
         ----------
-        Z : ArrayRDD, TupleRDD or DisctRDD
+        Z : ArrayRDD, TupleRDD or DictRDD
             Input data in blocked distributed format.
 
         Returns

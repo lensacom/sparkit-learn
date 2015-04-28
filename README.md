@@ -179,7 +179,7 @@ local_pipeline = Pipeline((
 	('vect', HashingVectorizer()),
 	('tfidf', TfidfTransformer())
 ))
-dist_pipeline = Pipeline((
+dist_pipeline = SparkPipeline((
 	('vect', SparkHashingVectorizer()),
 	('tfidf', SparkTfidfTransformer())
 ))
@@ -213,7 +213,7 @@ local_pipeline = Pipeline((
 	('tfidf', TfidfTransformer()),
 	('clf', LinearSVC())
 ))
-dist_pipeline = Pipeline((
+dist_pipeline = SparkPipeline((
 	('vect', SparkHashingVectorizer()),
 	('tfidf', SparkTfidfTransformer()),
 	('clf', SparkLinearSVC())
