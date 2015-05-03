@@ -468,9 +468,6 @@ class TupleRDD(ArrayRDD):
             mapper = f
         return TupleRDD(self.map(mapper))
 
-    def cartesian(self, other):
-        return TupleRDD(self._rdd.cartesian(other._rdd), False)
-
 
 class DictRDD(TupleRDD):
 

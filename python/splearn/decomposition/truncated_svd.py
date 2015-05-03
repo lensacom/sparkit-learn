@@ -3,6 +3,7 @@ from operator import add
 import numpy as np
 import scipy.linalg as ln
 from sklearn.decomposition import TruncatedSVD
+from sklearn.utils.extmath import safe_sparse_dot
 
 from ..rdd import ArrayRDD, DictRDD
 
@@ -56,8 +57,8 @@ def svd_em(blocked_rdd, k, maxiter=20, tol=1e-6, seed=None):
     d^2 to fit into memory on a single machine.
     Parameters
     ----------
-    blocked_rdd : RDD
-        RDD with data points in numpy array blocks
+    blocked_rdd : ArrayRDD
+        ArrayRDD with data points in numpy array blocks
     k : Int
         Number of singular vectors to return
     maxiter : Int, optional, default = 20
@@ -76,8 +77,9 @@ def svd_em(blocked_rdd, k, maxiter=20, tol=1e-6, seed=None):
         Right eigenvectors
     """
 
-    n = blocked_rdd.shape[0]
-    m = len(blocked_rdd.first()[0])
+    # n = blocked_rdd.shape[0]
+    # m = len(blocked_rdd.first()[0])
+    n, m = blocked_rdd.shape[:2]
 
     def outerprod(x):
         return x.T.dot(x)
@@ -87,6 +89,7 @@ def svd_em(blocked_rdd, k, maxiter=20, tol=1e-6, seed=None):
         c = rng.randn(k, m)
     else:
         c = np.random.randn(k, m)
+
     iter = 0
     error = 100
 
@@ -95,17 +98,19 @@ def svd_em(blocked_rdd, k, maxiter=20, tol=1e-6, seed=None):
     # m-step: c = y x' (xx')^-1
     while (iter < maxiter) & (error > tol):
         c_old = c
+
         # pre compute (cc')^-1 c
         c_inv = np.dot(c.T, ln.inv(np.dot(c, c.T)))
         premult1 = blocked_rdd._rdd.context.broadcast(c_inv)
         # compute (xx')^-1 through a map reduce
-        xx = blocked_rdd.map(lambda x: outerprod(np.dot(x, premult1.value))) \
+        xx = blocked_rdd.map(lambda x: outerprod(safe_sparse_dot(x, premult1.value))) \
                         .reduce(add)
         xx_inv = ln.inv(xx)
+
         # pre compute (cc')^-1 c (xx')^-1
         premult2 = blocked_rdd._rdd.context.broadcast(np.dot(c_inv, xx_inv))
         # compute the new c through a map reduce
-        c = blocked_rdd.map(lambda x: np.dot(x.T, np.dot(x, premult2.value))) \
+        c = blocked_rdd.map(lambda x: safe_sparse_dot(x.T, safe_sparse_dot(x, premult2.value))) \
                        .reduce(add)
         c = c.T
 
@@ -115,7 +120,7 @@ def svd_em(blocked_rdd, k, maxiter=20, tol=1e-6, seed=None):
     # project data into subspace spanned by columns of c
     # use standard eigendecomposition to recover an orthonormal basis
     c = ln.orth(c.T).T
-    cov = blocked_rdd.map(lambda x: np.dot(x, c.T)) \
+    cov = blocked_rdd.map(lambda x: safe_sparse_dot(x, c.T)) \
                      .map(lambda x: outerprod(x)) \
                      .reduce(add)
     w, v = ln.eig(cov / n)
@@ -124,7 +129,7 @@ def svd_em(blocked_rdd, k, maxiter=20, tol=1e-6, seed=None):
     inds = np.argsort(w)[::-1]
     s = np.sqrt(w[inds[0:k]]) * np.sqrt(n)
     v = np.dot(v[:, inds[0:k]].T, c)
-    u = ArrayRDD(blocked_rdd.map(lambda x: np.inner(x, v) / s))
+    u = blocked_rdd.map(lambda x: safe_sparse_dot(x, v.T) / s)
 
     return u, s, v
 
