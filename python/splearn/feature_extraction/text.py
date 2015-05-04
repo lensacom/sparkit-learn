@@ -215,6 +215,7 @@ class SparkCountVectorizer(CountVectorizer):
             if not vocabulary:
                 raise ValueError("empty vocabulary; perhaps the documents only"
                                  " contain stop words")
+            return vocabulary
 
         j_indices = frombuffer_empty(j_indices, dtype=np.intc)
         indptr = np.frombuffer(indptr, dtype=np.intc)
@@ -224,7 +225,7 @@ class SparkCountVectorizer(CountVectorizer):
                           shape=(len(indptr) - 1, len(vocabulary)),
                           dtype=self.dtype)
         X.sum_duplicates()
-        return X if fixed_vocab else vocabulary
+        return X
 
     def _init_vocab(self, raw_documents, fixed_vocab):
         """Create sparse feature matrix, and vocabulary where fixed_vocab=False
@@ -237,8 +238,8 @@ class SparkCountVectorizer(CountVectorizer):
             self.distvocab_ = raw_documents._rdd.ctx.broadcast(vocabulary)
         else:
             keys = raw_documents \
-                .map(lambda x: self._count_vocab(x, False).keys()) \
-                .reduce(lambda x, y: np.unique(np.concatenate([x, y])))
+                .map(lambda x: set(self._count_vocab(x, False))) \
+                .reduce(lambda x, y: x | y)
             vocabulary = dict((f, i) for i, f in enumerate(keys))
             self.vocabulary_ = vocabulary
             fixed_vocab = raw_documents._rdd.ctx.broadcast(vocabulary)
@@ -292,7 +293,7 @@ class SparkCountVectorizer(CountVectorizer):
             X = X.map(lambda x: x.data.fill(1))
 
         if not self.fixed_vocabulary_:
-            X = self._sort_features(X, vocabulary)
+            X = self._sort_features(X, vocabulary).cache()
 
             n_doc = X.shape[0]
             max_doc_count = (max_df
