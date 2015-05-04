@@ -11,8 +11,7 @@ from sklearn.feature_extraction.text import (CountVectorizer,
                                              HashingVectorizer,
                                              TfidfTransformer,
                                              _document_frequency,
-                                             _make_int_array)
-from sklearn.utils.fixes import frombuffer_empty
+                                             _make_int_array, frombuffer_empty)
 
 from ..rdd import ArrayRDD, DictRDD
 

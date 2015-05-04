@@ -43,11 +43,6 @@ class FeatureExtractionTextTestCase(SplearnTestCase):
         X_rdd = ArrayRDD(self.sc.parallelize(X, 4), blocks)
         return X, X_rdd
 
-    def generate_20newsgroup(self, blocks=None):
-        X = fetch_20newsgroups().data
-        X_rdd = ArrayRDD(self.sc.parallelize(X, 4), blocks)
-        return X, X_rdd
-
 
 class TestCountVectorizer(FeatureExtractionTextTestCase):
 
@@ -64,24 +59,6 @@ class TestCountVectorizer(FeatureExtractionTextTestCase):
 
     def test_limit_features(self):
         X, X_rdd = self.generate_text_dataset()
-
-        params = [{'min_df': .5},
-                  {'min_df': 2, 'max_df': .9},
-                  {'min_df': 1, 'max_df': .6},
-                  {'min_df': 2, 'max_features': 3}]
-
-        for paramset in params:
-            local = CountVectorizer(**paramset)
-            dist = SparkCountVectorizer(**paramset)
-
-            result_local = local.fit_transform(X)
-            result_dist = sp.vstack(dist.fit_transform(X_rdd).collect())
-
-            assert_equal(local.vocabulary_, dist.vocabulary_)
-            assert_array_equal(result_local.toarray(), result_dist.toarray())
-
-    def test_limit_features_20newsgroup(self):
-        X, X_rdd = self.generate_20newsgroup()
 
         params = [{'min_df': .5},
                   {'min_df': 2, 'max_df': .9},
