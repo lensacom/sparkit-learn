@@ -29,7 +29,8 @@ def _block_tuple(iterator, block_size=None):
         for x_j, x in zip(tuple_i, blocked_tuple):
             x.append(x_j)
         i += 1
-    yield tuple(_pack_accumulated(x) for x in blocked_tuple)
+    if i > 0:
+        yield tuple(_pack_accumulated(x) for x in blocked_tuple)
 
 
 def _block_collection(iterator, block_size=None):
@@ -43,7 +44,8 @@ def _block_collection(iterator, block_size=None):
             i = 0
         accumulated.append(a)
         i += 1
-    yield _pack_accumulated(accumulated)
+    if i > 0:
+        yield _pack_accumulated(accumulated)
 
 
 def block(rdd, block_size=None):

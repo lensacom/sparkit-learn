@@ -87,6 +87,25 @@ class TestHashingVectorizer(FeatureExtractionTextTestCase):
         result_dist = sp.vstack(dist.transform(X_rdd).collect())
         assert_array_equal(result_local.toarray(), result_dist.toarray())
 
+    def test_dummy_analyzer(self):
+        X, X_rdd = self.generate_text_dataset()
+
+        def splitter(x):
+            return x.split()
+        X = map(splitter, X)
+        X_rdd = X_rdd.map(lambda x: map(splitter, x))
+
+        local = HashingVectorizer(analyzer=lambda x: x)
+        dist = SparkHashingVectorizer(analyzer=lambda x: x)
+
+        result_local = local.transform(X)
+        result_dist = sp.vstack(dist.transform(X_rdd).collect())
+        assert_array_equal(result_local.toarray(), result_dist.toarray())
+
+        result_local = local.fit_transform(X)
+        result_dist = sp.vstack(dist.fit_transform(X_rdd).collect())
+        assert_array_equal(result_local.toarray(), result_dist.toarray())
+
 
 class TestTfidfTransformer(FeatureExtractionTextTestCase):
 

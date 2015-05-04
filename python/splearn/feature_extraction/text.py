@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import copy
 import numbers
 from collections import defaultdict
 
@@ -235,6 +234,7 @@ class SparkCountVectorizer(CountVectorizer):
 
         if fixed_vocab:
             vocabulary = self.vocabulary_
+            # TODO: if not broadcasted already - in case of transform
             self.distvocab_ = raw_documents._rdd.ctx.broadcast(vocabulary)
         else:
             keys = raw_documents \

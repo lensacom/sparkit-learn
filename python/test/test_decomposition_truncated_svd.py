@@ -123,15 +123,3 @@ class TestTruncatedSVD(SVDTestCase):
         assert_array_equal(Z_local.shape, Z_dist.shape)
         assert(np.allclose(+Z_dist[:, 0], Z_local[:, 0], atol=tol) |
                np.allclose(-Z_dist[:, 0], Z_local[:, 0], atol=tol))
-
-        # assert_array_almost_equal(Z_dist[:, 0],
-        #                           match_sign(Z_dist[:, 0], Z_local[:, 0]),
-        #                           decimal=2)
-
-        # Z_local = local.transform(X)
-        # Z_dist = dist.transform(X_rdd).toarray()
-
-        # assert_array_equal(Z_local.shape, Z_dist.shape)
-        # assert_array_almost_equal(Z_dist[:, 0],
-        #                           match_sign(Z_dist[:, 0], Z_local[:, 0]),
-        #                           decimal=2)
