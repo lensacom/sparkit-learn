@@ -1,24 +1,20 @@
 import shutil
 import tempfile
+
 import numpy as np
 import scipy.sparse as sp
-
-from nose.tools import assert_equal
-from nose.tools import assert_true
-from numpy.testing import assert_array_almost_equal
-from numpy.testing import assert_array_equal
-
-from sklearn.datasets import make_classification, fetch_20newsgroups
-from sklearn.feature_extraction.tests.test_text import ALL_FOOD_DOCS
-from sklearn.feature_extraction.text import HashingVectorizer
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.feature_extraction.text import TfidfTransformer
-
 from common import SplearnTestCase
+from nose.tools import assert_equal, assert_true
+from numpy.testing import assert_array_almost_equal, assert_array_equal
+from sklearn.datasets import fetch_20newsgroups, make_classification
+from sklearn.feature_extraction.tests.test_text import ALL_FOOD_DOCS
+from sklearn.feature_extraction.text import (CountVectorizer,
+                                             HashingVectorizer,
+                                             TfidfTransformer)
+from splearn.feature_extraction.text import (SparkCountVectorizer,
+                                             SparkHashingVectorizer,
+                                             SparkTfidfTransformer)
 from splearn.rdd import ArrayRDD, DictRDD
-from splearn.feature_extraction.text import SparkHashingVectorizer
-from splearn.feature_extraction.text import SparkCountVectorizer
-from splearn.feature_extraction.text import SparkTfidfTransformer
 
 
 class FeatureExtractionTextTestCase(SplearnTestCase):
@@ -47,6 +43,11 @@ class FeatureExtractionTextTestCase(SplearnTestCase):
         X_rdd = ArrayRDD(self.sc.parallelize(X, 4), blocks)
         return X, X_rdd
 
+    def generate_20newsgroup(self, blocks=None):
+        X = fetch_20newsgroups().data
+        X_rdd = ArrayRDD(self.sc.parallelize(X, 4), blocks)
+        return X, X_rdd
+
 
 class TestCountVectorizer(FeatureExtractionTextTestCase):
 
@@ -60,6 +61,42 @@ class TestCountVectorizer(FeatureExtractionTextTestCase):
 
         assert_equal(local.vocabulary_, dist.vocabulary_)
         assert_array_equal(result_local.toarray(), result_dist.toarray())
+
+    def test_limit_features(self):
+        X, X_rdd = self.generate_text_dataset()
+
+        params = [{'min_df': .5},
+                  {'min_df': 2, 'max_df': .9},
+                  {'min_df': 1, 'max_df': .6},
+                  {'min_df': 2, 'max_features': 3}]
+
+        for paramset in params:
+            local = CountVectorizer(**paramset)
+            dist = SparkCountVectorizer(**paramset)
+
+            result_local = local.fit_transform(X)
+            result_dist = sp.vstack(dist.fit_transform(X_rdd).collect())
+
+            assert_equal(local.vocabulary_, dist.vocabulary_)
+            assert_array_equal(result_local.toarray(), result_dist.toarray())
+
+    def test_limit_features_20newsgroup(self):
+        X, X_rdd = self.generate_20newsgroup()
+
+        params = [{'min_df': .5},
+                  {'min_df': 2, 'max_df': .9},
+                  {'min_df': 1, 'max_df': .6},
+                  {'min_df': 2, 'max_features': 3}]
+
+        for paramset in params:
+            local = CountVectorizer(**paramset)
+            dist = SparkCountVectorizer(**paramset)
+
+            result_local = local.fit_transform(X)
+            result_dist = sp.vstack(dist.fit_transform(X_rdd).collect())
+
+            assert_equal(local.vocabulary_, dist.vocabulary_)
+            assert_array_equal(result_local.toarray(), result_dist.toarray())
 
 
 class TestHashingVectorizer(FeatureExtractionTextTestCase):

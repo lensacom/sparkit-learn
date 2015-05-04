@@ -1,18 +1,24 @@
 # -*- coding: utf-8 -*-
 
-from ..rdd import DictRDD, ArrayRDD
+import copy
+import numbers
+from collections import defaultdict
 
 import numpy as np
 import scipy.sparse as sp
+import six
+from sklearn.feature_extraction.text import (CountVectorizer,
+                                             HashingVectorizer,
+                                             TfidfTransformer,
+                                             _document_frequency,
+                                             _make_int_array)
+from sklearn.utils.fixes import frombuffer_empty
 
-from collections import defaultdict
-
-from sklearn.feature_extraction.text import CountVectorizer, HashingVectorizer
-from sklearn.feature_extraction.text import TfidfTransformer
-from sklearn.feature_extraction.text import _document_frequency
+from ..rdd import ArrayRDD, DictRDD
 
 
 class SparkCountVectorizer(CountVectorizer):
+
     """Distributed implementation of CountVectorizer.
 
     Convert a collection of text documents to a matrix of token counts
@@ -78,16 +84,14 @@ class SparkCountVectorizer(CountVectorizer):
         if `tokenize == 'word'`. The default regexp select tokens of 2
         or more alphanumeric characters (punctuation is completely ignored
         and always treated as a token separator).
-    max_df : NOT AVAILABLE yet
-        float in range [0.0, 1.0] or int, optional, 1.0 by default
+    max_df : float in range [0.0, 1.0] or int, optional, 1.0 by default
         When building the vocabulary ignore terms that have a document
         frequency strictly higher than the given threshold (corpus-specific
         stop words).
         If float, the parameter represents a proportion of documents, integer
         absolute counts.
         This parameter is ignored if vocabulary is not None.
-    min_df : NOT AVAILABLE yet
-        float in range [0.0, 1.0] or int, optional, 1 by default
+    min_df : float in range [0.0, 1.0] or int, optional, 1 by default
         When building the vocabulary ignore terms that have a document
         frequency strictly lower than the given threshold. This value is also
         called cut-off in the literature.
@@ -126,7 +130,104 @@ class SparkCountVectorizer(CountVectorizer):
     HashingVectorizer, TfidfVectorizer
     """
 
+    def _sort_features(self, X, vocabulary):
+        """Sort features by name
+
+        Returns a reordered matrix and modifies the vocabulary in place
+        """
+        sorted_features = sorted(six.iteritems(vocabulary))
+        map_index = np.empty(len(sorted_features), dtype=np.int32)
+        for new_val, (term, old_val) in enumerate(sorted_features):
+            map_index[new_val] = old_val
+            vocabulary[term] = new_val
+
+        return X.map(lambda x: x[:, map_index])
+
+    def _limit_features(self, X, vocabulary, high=None, low=None,
+                        limit=None):
+        """Remove too rare or too common features.
+
+        Prune features that are non zero in more samples than high or less
+        documents than low, modifying the vocabulary, and restricting it to
+        at most the limit most frequent.
+
+        This does not prune samples with zero features.
+        """
+        if high is None and low is None and limit is None:
+            return X, set()
+
+        # Calculate a mask based on document frequencies
+        dfs = X.map(_document_frequency).sum()
+        tfs = X.map(lambda x: np.asarray(x.sum(axis=0))).sum().ravel()
+        mask = np.ones(len(dfs), dtype=bool)
+        if high is not None:
+            mask &= dfs <= high
+        if low is not None:
+            mask &= dfs >= low
+        if limit is not None and mask.sum() > limit:
+            mask_inds = (-tfs[mask]).argsort()[:limit]
+            new_mask = np.zeros(len(dfs), dtype=bool)
+            new_mask[np.where(mask)[0][mask_inds]] = True
+            mask = new_mask
+
+        new_indices = np.cumsum(mask) - 1  # maps old indices to new
+        removed_terms = set()
+        for term, old_index in list(six.iteritems(vocabulary)):
+            if mask[old_index]:
+                vocabulary[term] = new_indices[old_index]
+            else:
+                del vocabulary[term]
+                removed_terms.add(term)
+        kept_indices = np.where(mask)[0]
+        if len(kept_indices) == 0:
+            raise ValueError("After pruning, no terms remain. Try a lower"
+                             " min_df or a higher max_df.")
+
+        return X.map(lambda x: x[:, kept_indices]), removed_terms
+
     def _count_vocab(self, raw_documents, fixed_vocab):
+        """Create sparse feature matrix, and vocabulary where fixed_vocab=False
+        """
+        if fixed_vocab is True:
+            vocabulary = self.distvocab_.value
+        elif fixed_vocab is False:
+            # Add a new value when a new vocabulary item is seen
+            vocabulary = defaultdict()
+            vocabulary.default_factory = vocabulary.__len__
+        else:
+            vocabulary = fixed_vocab.value
+
+        analyze = self.build_analyzer()
+        j_indices = _make_int_array()
+        indptr = _make_int_array()
+        indptr.append(0)
+        for doc in raw_documents:
+            for feature in analyze(doc):
+                try:
+                    j_indices.append(vocabulary[feature])
+                except KeyError:
+                    # Ignore out-of-vocabulary items for fixed_vocab=True
+                    continue
+            indptr.append(len(j_indices))
+
+        if not fixed_vocab:
+            # disable defaultdict behaviour
+            vocabulary = dict(vocabulary)
+            if not vocabulary:
+                raise ValueError("empty vocabulary; perhaps the documents only"
+                                 " contain stop words")
+
+        j_indices = frombuffer_empty(j_indices, dtype=np.intc)
+        indptr = np.frombuffer(indptr, dtype=np.intc)
+        values = np.ones(len(j_indices))
+
+        X = sp.csr_matrix((values, j_indices, indptr),
+                          shape=(len(indptr) - 1, len(vocabulary)),
+                          dtype=self.dtype)
+        X.sum_duplicates()
+        return X if fixed_vocab else vocabulary
+
+    def _init_vocab(self, raw_documents, fixed_vocab):
         """Create sparse feature matrix, and vocabulary where fixed_vocab=False
         """
         if isinstance(raw_documents, DictRDD):
@@ -134,16 +235,16 @@ class SparkCountVectorizer(CountVectorizer):
 
         if fixed_vocab:
             vocabulary = self.vocabulary_
+            self.distvocab_ = raw_documents._rdd.ctx.broadcast(vocabulary)
         else:
-            mapper = lambda x: super(SparkCountVectorizer, self)._count_vocab(x, False)[0].keys()
-            reducer = lambda x, y: np.unique(np.concatenate([x, y]))
-            keys = raw_documents.map(mapper).reduce(reducer)
+            keys = raw_documents \
+                .map(lambda x: self._count_vocab(x, False).keys()) \
+                .reduce(lambda x, y: np.unique(np.concatenate([x, y])))
             vocabulary = dict((f, i) for i, f in enumerate(keys))
             self.vocabulary_ = vocabulary
+            fixed_vocab = raw_documents._rdd.ctx.broadcast(vocabulary)
 
-        self.fixed_vocabulary_ = True
-        mapper = lambda x: \
-            super(SparkCountVectorizer, self)._count_vocab(x, True)[1]
+        mapper = lambda x: self._count_vocab(x, fixed_vocab)
         return vocabulary, raw_documents.map(mapper)
 
     def fit(self, raw_documents):
@@ -180,10 +281,43 @@ class SparkCountVectorizer(CountVectorizer):
         X : array, [n_samples, n_features] or DictRDD
             Document-term matrix.
         """
-        return super(SparkCountVectorizer, self).fit_transform(raw_documents)
+        self._validate_vocabulary()
+        max_df = self.max_df
+        min_df = self.min_df
+        max_features = self.max_features
+
+        vocabulary, X = self._init_vocab(raw_documents,
+                                         self.fixed_vocabulary_)
+
+        if self.binary:
+            X = X.map(lambda x: x.data.fill(1))
+
+        if not self.fixed_vocabulary_:
+            X = self._sort_features(X, vocabulary)
+
+            n_doc = X.shape[0]
+            max_doc_count = (max_df
+                             if isinstance(max_df, numbers.Integral)
+                             else max_df * n_doc)
+            min_doc_count = (min_df
+                             if isinstance(min_df, numbers.Integral)
+                             else min_df * n_doc)
+            if max_doc_count < min_doc_count:
+                raise ValueError(
+                    "max_df corresponds to < documents than min_df")
+            X, self.stop_words_ = self._limit_features(X, vocabulary,
+                                                       max_doc_count,
+                                                       min_doc_count,
+                                                       max_features)
+
+            self.vocabulary_ = vocabulary
+            self.distvocab_ = raw_documents._rdd.ctx.broadcast(vocabulary)
+
+        return X
 
 
 class SparkHashingVectorizer(HashingVectorizer):
+
     """Distributed implementation of Hashingvectorizer.
 
     Convert a collection of text documents to a matrix of token occurrences
@@ -318,6 +452,7 @@ class SparkHashingVectorizer(HashingVectorizer):
 
 
 class SparkTfidfTransformer(TfidfTransformer):
+
     """Distributed implementation of TfidfTransformer.
 
     Transform a count matrix to a normalized tf or tf-idf representation
@@ -363,7 +498,6 @@ class SparkTfidfTransformer(TfidfTransformer):
                    Introduction to Information Retrieval. Cambridge University
                    Press, pp. 118-120.`
     """
-
 
     def fit(self, Z):
         """Learn the idf vector (global term weights)
