@@ -75,6 +75,9 @@ class TestCountVectorizer(FeatureExtractionTextTestCase):
             assert_equal(local.vocabulary_, dist.vocabulary_)
             assert_array_equal(result_local.toarray(), result_dist.toarray())
 
+            result_dist = sp.vstack(dist.transform(X_rdd).collect())
+            assert_array_equal(result_local.toarray(), result_dist.toarray())
+
 
 class TestHashingVectorizer(FeatureExtractionTextTestCase):
 

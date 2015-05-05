@@ -2,10 +2,12 @@
 
 import numbers
 from collections import defaultdict
+from itertools import chain
 
 import numpy as np
 import scipy.sparse as sp
 import six
+from pyspark import AccumulatorParam
 from sklearn.feature_extraction.text import (CountVectorizer,
                                              HashingVectorizer,
                                              TfidfTransformer,
@@ -128,6 +130,63 @@ class SparkCountVectorizer(CountVectorizer):
     HashingVectorizer, TfidfVectorizer
     """
 
+    __transient__ = ['vocabulary_']  # cloudpickle won't serialize
+
+    def _init_vocab(self, analyzed_docs):
+        """Create vocabulary
+        """
+        class SetAccum(AccumulatorParam):
+
+            def zero(self, initialValue):
+                return set(initialValue)
+
+            def addInPlace(self, v1, v2):
+                v1 |= v2
+                return v1
+
+        if not self.fixed_vocabulary_:
+            accum = analyzed_docs._rdd.ctx.accumulator(set(), SetAccum())
+            analyzed_docs.foreach(
+                lambda x: accum.add(set(chain.from_iterable(x))))
+            vocabulary = {t: i for i, t in enumerate(accum.value)}
+        else:
+            vocabulary = self.vocabulary_
+
+        if not vocabulary:
+            raise ValueError("empty vocabulary; perhaps the documents only"
+                             " contain stop words")
+        return vocabulary
+
+    def _count_vocab(self, analyzed_docs, broadcasted_vocab):
+        """Create sparse feature matrix, and vocabulary where fixed_vocab=False
+        """
+        vocabulary = broadcasted_vocab.value
+        j_indices = _make_int_array()
+        indptr = _make_int_array()
+        indptr.append(0)
+        for doc in analyzed_docs:
+            for feature in doc:
+                try:
+                    j_indices.append(vocabulary[feature])
+                except KeyError:
+                    # Ignore out-of-vocabulary items for fixed_vocab=True
+                    continue
+            indptr.append(len(j_indices))
+
+        j_indices = frombuffer_empty(j_indices, dtype=np.intc)
+        indptr = np.frombuffer(indptr, dtype=np.intc)
+        values = np.ones(len(j_indices))
+
+        X = sp.csr_matrix((values, j_indices, indptr),
+                          shape=(len(indptr) - 1, len(vocabulary)),
+                          dtype=self.dtype)
+        X.sum_duplicates()
+
+        if self.binary:
+            X.data.fill(1)
+
+        return X
+
     def _sort_features(self, X, vocabulary):
         """Sort features by name
 
@@ -139,7 +198,7 @@ class SparkCountVectorizer(CountVectorizer):
             map_index[new_val] = old_val
             vocabulary[term] = new_val
 
-        return X.map(lambda x: x[:, map_index])
+        return map_index
 
     def _limit_features(self, X, vocabulary, high=None, low=None,
                         limit=None):
@@ -177,77 +236,14 @@ class SparkCountVectorizer(CountVectorizer):
                 del vocabulary[term]
                 removed_terms.add(term)
         kept_indices = np.where(mask)[0]
+
         if len(kept_indices) == 0:
             raise ValueError("After pruning, no terms remain. Try a lower"
                              " min_df or a higher max_df.")
 
-        return X.map(lambda x: x[:, kept_indices]), removed_terms
+        return kept_indices, removed_terms
 
-    def _count_vocab(self, raw_documents, fixed_vocab):
-        """Create sparse feature matrix, and vocabulary where fixed_vocab=False
-        """
-        if fixed_vocab is True:
-            vocabulary = self.distvocab_.value
-        elif fixed_vocab is False:
-            # Add a new value when a new vocabulary item is seen
-            vocabulary = defaultdict()
-            vocabulary.default_factory = vocabulary.__len__
-        else:
-            vocabulary = fixed_vocab.value
-
-        analyze = self.build_analyzer()
-        j_indices = _make_int_array()
-        indptr = _make_int_array()
-        indptr.append(0)
-        for doc in raw_documents:
-            for feature in analyze(doc):
-                try:
-                    j_indices.append(vocabulary[feature])
-                except KeyError:
-                    # Ignore out-of-vocabulary items for fixed_vocab=True
-                    continue
-            indptr.append(len(j_indices))
-
-        if not fixed_vocab:
-            # disable defaultdict behaviour
-            vocabulary = dict(vocabulary)
-            if not vocabulary:
-                raise ValueError("empty vocabulary; perhaps the documents only"
-                                 " contain stop words")
-            return vocabulary
-
-        j_indices = frombuffer_empty(j_indices, dtype=np.intc)
-        indptr = np.frombuffer(indptr, dtype=np.intc)
-        values = np.ones(len(j_indices))
-
-        X = sp.csr_matrix((values, j_indices, indptr),
-                          shape=(len(indptr) - 1, len(vocabulary)),
-                          dtype=self.dtype)
-        X.sum_duplicates()
-        return X
-
-    def _init_vocab(self, raw_documents, fixed_vocab):
-        """Create sparse feature matrix, and vocabulary where fixed_vocab=False
-        """
-        if isinstance(raw_documents, DictRDD):
-            raw_documents = raw_documents[:, 'X']
-
-        if fixed_vocab:
-            vocabulary = self.vocabulary_
-            # TODO: if not broadcasted already - in case of transform
-            self.distvocab_ = raw_documents._rdd.ctx.broadcast(vocabulary)
-        else:
-            keys = raw_documents \
-                .map(lambda x: set(self._count_vocab(x, False))) \
-                .reduce(lambda x, y: x | y)
-            vocabulary = dict((f, i) for i, f in enumerate(keys))
-            self.vocabulary_ = vocabulary
-            fixed_vocab = raw_documents._rdd.ctx.broadcast(vocabulary)
-
-        mapper = lambda x: self._count_vocab(x, fixed_vocab)
-        return vocabulary, raw_documents.map(mapper)
-
-    def fit(self, raw_documents):
+    def fit(self, Z):
         """Learn a vocabulary dictionary of all tokens in the raw documents in
         the DictRDD's 'X' column.
 
@@ -261,10 +257,10 @@ class SparkCountVectorizer(CountVectorizer):
         -------
         self
         """
-        self.fit_transform(raw_documents)
+        self.fit_transform(Z)
         return self
 
-    def fit_transform(self, raw_documents):
+    def fit_transform(self, Z):
         """Learn the vocabulary dictionary and return term-document matrix.
 
         This is equivalent to fit followed by transform, but more efficiently
@@ -272,9 +268,10 @@ class SparkCountVectorizer(CountVectorizer):
 
         Parameters
         ----------
-        raw_documents : iterable or DictRDD with column 'X'
-            An iterable which yields either str, unicode or file objects; or a
-            DictRDD with column 'X' containing such iterables.
+        Z : iterable or DictRDD with column 'X'
+            An iterable of raw_documents which yields either str, unicode or
+            file objects; or a DictRDD with column 'X' containing such
+            iterables.
 
         Returns
         -------
@@ -282,19 +279,27 @@ class SparkCountVectorizer(CountVectorizer):
             Document-term matrix.
         """
         self._validate_vocabulary()
-        max_df = self.max_df
-        min_df = self.min_df
-        max_features = self.max_features
 
-        vocabulary, X = self._init_vocab(raw_documents,
-                                         self.fixed_vocabulary_)
+        # map analyzer and cache result
+        analyze = self.build_analyzer()
+        A = Z.transform(lambda X: map(analyze, X), column='X').persist()
 
-        if self.binary:
-            X = X.map(lambda x: x.data.fill(1))
+        # create and broadcast vocabulary
+        X = A[:, 'X'] if isinstance(A, DictRDD) else A
+        vocabulary = self._init_vocab(X)
+        dist_vocab = A._rdd.ctx.broadcast(vocabulary)
+
+        # transform according to vocabulary
+        Z = A.transform(lambda X: self._count_vocab(X, dist_vocab), column='X')
 
         if not self.fixed_vocabulary_:
-            X = self._sort_features(X, vocabulary).cache()
+            X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
 
+            max_df = self.max_df
+            min_df = self.min_df
+            max_features = self.max_features
+
+            # limit features according to min_df, max_df parameters
             n_doc = X.shape[0]
             max_doc_count = (max_df
                              if isinstance(max_df, numbers.Integral)
@@ -305,15 +310,51 @@ class SparkCountVectorizer(CountVectorizer):
             if max_doc_count < min_doc_count:
                 raise ValueError(
                     "max_df corresponds to < documents than min_df")
-            X, self.stop_words_ = self._limit_features(X, vocabulary,
-                                                       max_doc_count,
-                                                       min_doc_count,
-                                                       max_features)
+            kept_indices, self.stop_words_ = self._limit_features(
+                X, vocabulary, max_doc_count, min_doc_count, max_features)
 
+            # sort features
+            map_index = self._sort_features(X, vocabulary)
+
+            # combined mask
+            mask = kept_indices[map_index]
+
+            Z = Z.transform(lambda x: x[:, mask], column='X')
+
+            # set state
             self.vocabulary_ = vocabulary
-            self.distvocab_ = raw_documents._rdd.ctx.broadcast(vocabulary)
+            self.dist_vocab_ = Z._rdd.ctx.broadcast(vocabulary)
 
-        return X
+        A.unpersist()
+        return Z
+
+    def transform(self, Z):
+        """Transform documents to document-term matrix.
+
+        Extract token counts out of raw text documents using the vocabulary
+        fitted with fit or the one provided to the constructor.
+
+        Parameters
+        ----------
+        raw_documents : iterable
+            An iterable which yields either str, unicode or file objects.
+
+        Returns
+        -------
+        X : sparse matrix, [n_samples, n_features]
+            Document-term matrix.
+        """
+        if not hasattr(self, 'vocabulary_'):
+            self._validate_vocabulary()
+
+        self._check_vocabulary()
+
+        analyze = self.build_analyzer()
+        Z = Z.transform(lambda X: map(analyze, X), column='X') \
+             .transform(
+            lambda X: self._count_vocab(X, self.dist_vocab_), column='X')
+
+        return Z
 
 
 class SparkHashingVectorizer(HashingVectorizer):
@@ -440,13 +481,7 @@ class SparkHashingVectorizer(HashingVectorizer):
             Document-term matrix.
         """
         mapper = super(SparkHashingVectorizer, self).transform
-        if isinstance(Z, DictRDD):
-            return Z.transform(mapper, column='X')
-        elif isinstance(Z, ArrayRDD):
-            return Z.transform(mapper)
-        else:
-            raise TypeError(
-                "Expected DictRDD or ArrayRDD, given {0}".format(type(Z)))
+        return Z.transform(mapper, column='X')
 
     fit_transform = transform
 
@@ -556,10 +591,4 @@ class SparkTfidfTransformer(TfidfTransformer):
         Z : ArrayRDD/DictRDD containing sparse matrices
         """
         mapper = super(SparkTfidfTransformer, self).transform
-        if isinstance(Z, DictRDD):
-            return Z.transform(mapper, column='X')
-        elif isinstance(Z, ArrayRDD):
-            return Z.transform(mapper)
-        else:
-            raise TypeError(
-                "Expected DictRDD or ArrayRDD, given {0}".format(type(Z)))
+        return Z.transform(mapper, column='X')

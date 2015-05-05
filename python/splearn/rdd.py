@@ -290,8 +290,9 @@ class ArrayRDD(object):
     def tosparse(self):
         return sp.vstack(self.collect())
 
-    def transform(self, f):
+    def transform(self, f, column=None):
         """Equivalent to map, compatibility purpose only.
+        Column parameter ignored.
         """
         return self.map(f)
 
