@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import numbers
-from collections import defaultdict
 from itertools import chain
 
 import numpy as np
@@ -187,7 +186,7 @@ class SparkCountVectorizer(CountVectorizer):
 
         return X
 
-    def _sort_features(self, X, vocabulary):
+    def _sort_features(self, vocabulary):
         """Sort features by name
 
         Returns a reordered matrix and modifies the vocabulary in place
@@ -291,6 +290,8 @@ class SparkCountVectorizer(CountVectorizer):
 
         # transform according to vocabulary
         Z = A.transform(lambda X: self._count_vocab(X, dist_vocab), column='X')
+        Z = Z.persist()
+        A.unpersist()
 
         if not self.fixed_vocabulary_:
             X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
@@ -314,7 +315,7 @@ class SparkCountVectorizer(CountVectorizer):
                 X, vocabulary, max_doc_count, min_doc_count, max_features)
 
             # sort features
-            map_index = self._sort_features(X, vocabulary)
+            map_index = self._sort_features(vocabulary)
 
             # combined mask
             mask = kept_indices[map_index]
@@ -325,7 +326,6 @@ class SparkCountVectorizer(CountVectorizer):
             self.vocabulary_ = vocabulary
             self.dist_vocab_ = Z._rdd.ctx.broadcast(vocabulary)
 
-        A.unpersist()
         return Z
 
     def transform(self, Z):
@@ -348,6 +348,9 @@ class SparkCountVectorizer(CountVectorizer):
             self._validate_vocabulary()
 
         self._check_vocabulary()
+
+        if not hasattr(self, 'dist_vocab_'):
+            self.dist_vocab_ = Z._rdd.ctx.broadcast(self.vocabulary_)
 
         analyze = self.build_analyzer()
         Z = Z.transform(lambda X: map(analyze, X), column='X') \
