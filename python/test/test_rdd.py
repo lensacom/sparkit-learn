@@ -225,6 +225,19 @@ class TestArrayRDD(RDDTestCase):
         assert_is_instance(X_list, list)
         assert_equal(X_list, data)
 
+    def test_convert_toarray(self):
+        data = np.arange(400)
+        rdd = self.sc.parallelize(data, 4)
+        X = ArrayRDD(rdd, 5)
+        X_array = X.toarray()
+        assert_array_equal(X_array, data)
+
+        data = [2, 3, 5, 1, 6, 7, 9, 9]
+        rdd = self.sc.parallelize(data, 2)
+        X = ArrayRDD(rdd)
+        X_array = X.toarray()
+        assert_array_equal(X_array, np.array(data))
+
     def test_get_single_item(self):
         data = np.arange(400).reshape((100, 4))
         rdd = self.sc.parallelize(data, 4)
