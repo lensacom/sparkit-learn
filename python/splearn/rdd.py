@@ -285,7 +285,7 @@ class ArrayRDD(object):
     def toarray(self):
         """Returns the data as numpy.array from each partition.
         """
-        return np.array(self.unblock().collect())
+        return np.vstack(self.collect())
 
     def tosparse(self):
         return sp.vstack(self.collect())

@@ -258,9 +258,11 @@ class SparkTruncatedSVD(TruncatedSVD):
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
 
         if self.algorithm == "em":
+            X = X.persist()  # boosting iterative svm
             U, Sigma, V = svd_em(X, k=self.n_components, maxiter=self.n_iter,
                                  tol=self.tol, seed=self.random_state)
             self.components_ = V
+            X.unpersist()
             # return transformed data
             return U.transform(lambda x: np.dot(x, np.diag(Sigma)))
         else:

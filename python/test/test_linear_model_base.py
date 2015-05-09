@@ -1,18 +1,13 @@
 import shutil
 import tempfile
+
 import numpy as np
-import scipy.sparse as sp
-
-from nose.tools import assert_equal
-from nose.tools import assert_true
+from common import SplearnTestCase
 from numpy.testing import assert_array_almost_equal
-
 from sklearn.datasets import make_regression
 from sklearn.linear_model import LinearRegression
-
-from common import SplearnTestCase
-from splearn.rdd import ArrayRDD, DictRDD
 from splearn.linear_model import SparkLinearRegression
+from splearn.rdd import DictRDD
 
 
 class LinearModelBaseTestCase(SplearnTestCase):
@@ -40,6 +35,18 @@ class LinearModelBaseTestCase(SplearnTestCase):
 
 
 class TestLinearRegression(LinearModelBaseTestCase):
+
+    def test_same_coefs(self):
+        X, y, Z = self.generate_dataset(1, 100000)
+
+        local = LinearRegression()
+        dist = SparkLinearRegression()
+
+        local.fit(X, y)
+        dist.fit(Z)
+
+        assert_array_almost_equal(local.coef_, dist.coef_)
+        assert_array_almost_equal(local.intercept_, dist.intercept_)
 
     def test_same_prediction(self):
         X, y, Z = self.generate_dataset(1, 100000)
