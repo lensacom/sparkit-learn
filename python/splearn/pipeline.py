@@ -79,11 +79,13 @@ class SparkPipeline(Pipeline):
             fit_params_steps[step][param] = pval
         Zt = Z
         for name, transform in self.steps[:-1]:
+            Zt_tmp = Zt.persist()
             if hasattr(transform, "fit_transform"):
-                Zt = transform.fit_transform(Zt, **fit_params_steps[name])
+                Zt = transform.fit_transform(Zt_tmp, **fit_params_steps[name])
             else:
-                Zt = transform.fit(Zt, **fit_params_steps[name]) \
+                Zt = transform.fit(Zt_tmp, **fit_params_steps[name]) \
                               .transform(Zt)
+            Zt_tmp.unpersist()
         return Zt, fit_params_steps[self.steps[-1][0]]
 
     def fit(self, Z, **fit_params):

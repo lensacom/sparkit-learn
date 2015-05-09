@@ -11,7 +11,10 @@ from sklearn.feature_extraction.text import (CountVectorizer,
                                              HashingVectorizer,
                                              TfidfTransformer,
                                              _document_frequency,
-                                             _make_int_array, frombuffer_empty)
+                                             _make_int_array)
+from sklearn.preprocessing import normalize
+from sklearn.utils.fixes import frombuffer_empty
+from sklearn.utils.validation import check_is_fitted
 
 from ..rdd import ArrayRDD, DictRDD
 
@@ -537,6 +540,8 @@ class SparkTfidfTransformer(TfidfTransformer):
                    Press, pp. 118-120.`
     """
 
+    __transient__ = ['_idf_diag']  # cloudpickle won't serialize
+
     def fit(self, Z):
         """Learn the idf vector (global term weights)
 
@@ -593,5 +598,36 @@ class SparkTfidfTransformer(TfidfTransformer):
         -------
         Z : ArrayRDD/DictRDD containing sparse matrices
         """
-        mapper = super(SparkTfidfTransformer, self).transform
+        def mapper(X):
+            if hasattr(X, 'dtype') and np.issubdtype(X.dtype, np.float):
+                # preserve float family dtype
+                X = sp.csr_matrix(X, copy=False)
+            else:
+                # convert counts or binary occurrences to floats
+                X = sp.csr_matrix(X, dtype=np.float64, copy=False)
+
+            n_samples, n_features = X.shape
+
+            if self.sublinear_tf:
+                np.log(X.data, X.data)
+                X.data += 1
+
+            if self.use_idf:
+                expected_n_features = self._dist_idf_diag.value.shape[0]
+                if n_features != expected_n_features:
+                    raise ValueError("Input has n_features=%d while the model"
+                                     " has been trained with n_features=%d" % (
+                                         n_features, expected_n_features))
+                # *= doesn't work
+                X = X * self._dist_idf_diag.value
+
+            if self.norm:
+                X = normalize(X, norm=self.norm, copy=False)
+
+            return X
+
+        if self.use_idf:
+            check_is_fitted(self, '_idf_diag', 'idf vector is not fitted')
+            if not hasattr(self, '_dist_idf_diag'):
+                self._dist_idf_diag = Z._rdd.ctx.broadcast(self._idf_diag)
         return Z.transform(mapper, column='X')
