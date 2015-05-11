@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from setuptools import setup
+
 import splearn
 
 setup(
@@ -11,8 +12,10 @@ setup(
     author_email='krisztian.szucs@lensa.com, andras.fulop@lensa.com',
     url='https://github.com/lensacom/sparkit-learn',
     packages=['splearn',
-              'splearn.feature_extraction',
               'splearn.cluster',
+              'splearn.decomposition',
+              'splearn.feature_extraction',
+              'splearn.feature_selection',
               'splearn.linear_model',
               'splearn.svm'],
     long_description=open('../README.md').read(),
