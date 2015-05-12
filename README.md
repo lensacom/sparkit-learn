@@ -266,9 +266,10 @@ PYTHONPATH=${PYTHONPATH}:.. IPYTHON_OPTS="notebook" ${SPARK_HOME}/bin/pyspark --
 
 # Requirements
 
+- Python 2.7.x
 - NumPy[>=1.9.0]
 - SciPy[>=0.14.0]
-- Scikit-learn[=0.16-git]
+- Scikit-learn[>=0.16]
 - Spark[>=1.1.0]
 
 # Special thanks
