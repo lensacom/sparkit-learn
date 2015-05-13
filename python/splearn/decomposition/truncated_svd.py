@@ -120,11 +120,12 @@ def svd_em(blocked_rdd, k, maxiter=20, tol=1e-6, seed=None):
 
         # compute (xx')^-1 through a map reduce
         # xx = blocked_rdd.map(lambda x: outerprod(safe_sparse_dot(x, premult1.value))) \
-        #                 .reduce(add)
+        #                 .treeReduce(add)
 
         # compute (xx')^-1 using an accumulator
         run_sum = sc.accumulator(np.zeros((k, k)), MatrixAccum())
-        blocked_rdd.foreach(lambda x: accumsum(outerprod(safe_sparse_dot(x, premult1.value))))
+        blocked_rdd.map(lambda x: outerprod(safe_sparse_dot(x, premult1.value))) \
+                   .foreachPartition(lambda l: accumsum(sum(l)))
         xx = run_sum.value
         xx_inv = ln.inv(xx)
 
@@ -133,11 +134,12 @@ def svd_em(blocked_rdd, k, maxiter=20, tol=1e-6, seed=None):
 
         # compute the new c through a map reduce
         # c = blocked_rdd.map(lambda x: safe_sparse_dot(x.T, safe_sparse_dot(x, premult2.value))) \
-        #                .reduce(add)
+        #                .treeReduce(add)
 
         # compute the new c using an accumulator
         run_sum = sc.accumulator(np.zeros((m, k)), MatrixAccum())
-        blocked_rdd.foreach(lambda x: accumsum(safe_sparse_dot(x.T, safe_sparse_dot(x, premult2.value))))
+        blocked_rdd.map(lambda x: safe_sparse_dot(x.T, safe_sparse_dot(x, premult2.value))) \
+                   .foreachPartition(lambda l: accumsum(sum(l)))
         c = run_sum.value
         c = c.T
 
