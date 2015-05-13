@@ -38,9 +38,6 @@ class SparkVarianceThreshold(VarianceThreshold):
                [1, 1]])
     """
 
-    def __init__(self, threshold=0.):
-        self.threshold = threshold
-
     def fit(self, Z):
         """Learn empirical variances from X.
 
@@ -78,7 +75,7 @@ class SparkVarianceThreshold(VarianceThreshold):
                      ((n_a * n_b) * ((mean_b - mean_a) / n_ab)**2)
             return (n_ab, mean_ab, var_ab)
 
-        _, _, self.variances_ = X.map(mapper).reduce(reducer)
+        _, _, self.variances_ = X.map(mapper).treeReduce(reducer)
 
         if np.all(self.variances_ <= self.threshold):
             msg = "No feature in X meets the variance threshold {0:.5f}"

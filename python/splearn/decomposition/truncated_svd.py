@@ -2,10 +2,11 @@ from operator import add
 
 import numpy as np
 import scipy.linalg as ln
+from pyspark import AccumulatorParam
 from sklearn.decomposition import TruncatedSVD
 from sklearn.utils.extmath import safe_sparse_dot
 
-from ..rdd import ArrayRDD, DictRDD
+from ..rdd import DictRDD
 
 
 def svd(blocked_rdd, k):
@@ -77,12 +78,26 @@ def svd_em(blocked_rdd, k, maxiter=20, tol=1e-6, seed=None):
         Right eigenvectors
     """
 
-    # n = blocked_rdd.shape[0]
-    # m = len(blocked_rdd.first()[0])
     n, m = blocked_rdd.shape[:2]
+    sc = blocked_rdd._rdd.context
+
+    global run_sum
+
+    def accumsum(x):
+        global run_sum
+        run_sum += x
 
     def outerprod(x):
         return x.T.dot(x)
+
+    class MatrixAccum(AccumulatorParam):
+
+        def zero(self, value):
+            return np.zeros(np.shape(value))
+
+        def addInPlace(self, val1, val2):
+            val1 += val2
+            return val1
 
     if seed is not None:
         rng = np.random.RandomState(seed)
@@ -101,17 +116,29 @@ def svd_em(blocked_rdd, k, maxiter=20, tol=1e-6, seed=None):
 
         # pre compute (cc')^-1 c
         c_inv = np.dot(c.T, ln.inv(np.dot(c, c.T)))
-        premult1 = blocked_rdd._rdd.context.broadcast(c_inv)
+        premult1 = sc.broadcast(c_inv)
+
         # compute (xx')^-1 through a map reduce
-        xx = blocked_rdd.map(lambda x: outerprod(safe_sparse_dot(x, premult1.value))) \
-                        .reduce(add)
+        # xx = blocked_rdd.map(lambda x: outerprod(safe_sparse_dot(x, premult1.value))) \
+        #                 .reduce(add)
+
+        # compute (xx')^-1 using an accumulator
+        run_sum = sc.accumulator(np.zeros((k, k)), MatrixAccum())
+        blocked_rdd.foreach(lambda x: accumsum(outerprod(safe_sparse_dot(x, premult1.value))))
+        xx = run_sum.value
         xx_inv = ln.inv(xx)
 
         # pre compute (cc')^-1 c (xx')^-1
         premult2 = blocked_rdd._rdd.context.broadcast(np.dot(c_inv, xx_inv))
+
         # compute the new c through a map reduce
-        c = blocked_rdd.map(lambda x: safe_sparse_dot(x.T, safe_sparse_dot(x, premult2.value))) \
-                       .reduce(add)
+        # c = blocked_rdd.map(lambda x: safe_sparse_dot(x.T, safe_sparse_dot(x, premult2.value))) \
+        #                .reduce(add)
+
+        # compute the new c using an accumulator
+        run_sum = sc.accumulator(np.zeros((m, k)), MatrixAccum())
+        blocked_rdd.foreach(lambda x: accumsum(safe_sparse_dot(x.T, safe_sparse_dot(x, premult2.value))))
+        c = run_sum.value
         c = c.T
 
         error = np.sum((c - c_old) ** 2)

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import numbers
+import operator
 from itertools import chain
 
 import numpy as np
@@ -147,7 +148,7 @@ class SparkCountVectorizer(CountVectorizer):
                 return v1
 
         if not self.fixed_vocabulary_:
-            accum = analyzed_docs._rdd.ctx.accumulator(set(), SetAccum())
+            accum = analyzed_docs._rdd.context.accumulator(set(), SetAccum())
             analyzed_docs.foreach(
                 lambda x: accum.add(set(chain.from_iterable(x))))
             vocabulary = {t: i for i, t in enumerate(accum.value)}
@@ -289,7 +290,7 @@ class SparkCountVectorizer(CountVectorizer):
         # create and broadcast vocabulary
         X = A[:, 'X'] if isinstance(A, DictRDD) else A
         vocabulary = self._init_vocab(X)
-        dist_vocab = A._rdd.ctx.broadcast(vocabulary)
+        dist_vocab = A._rdd.context.broadcast(vocabulary)
 
         # transform according to vocabulary
         Z = A.transform(lambda X: self._count_vocab(X, dist_vocab), column='X')
@@ -327,7 +328,7 @@ class SparkCountVectorizer(CountVectorizer):
 
             # set state
             self.vocabulary_ = vocabulary
-            self.dist_vocab_ = Z._rdd.ctx.broadcast(vocabulary)
+            self.dist_vocab_ = Z._rdd.context.broadcast(vocabulary)
 
         return Z
 
@@ -353,7 +354,7 @@ class SparkCountVectorizer(CountVectorizer):
         self._check_vocabulary()
 
         if not hasattr(self, 'dist_vocab_'):
-            self.dist_vocab_ = Z._rdd.ctx.broadcast(self.vocabulary_)
+            self.dist_vocab_ = Z._rdd.context.broadcast(self.vocabulary_)
 
         analyze = self.build_analyzer()
         Z = Z.transform(lambda X: map(analyze, X), column='X') \
@@ -571,7 +572,7 @@ class SparkTfidfTransformer(TfidfTransformer):
                     "Expected DictRDD or ArrayRDD, given {0}".format(type(Z)))
 
             n_samples, n_features = X.shape
-            df = X.map(mapper).sum()
+            df = X.map(mapper).treeReduce(operator.add)
 
             # perform idf smoothing if required
             df += int(self.smooth_idf)
@@ -631,5 +632,5 @@ class SparkTfidfTransformer(TfidfTransformer):
         if self.use_idf:
             check_is_fitted(self, '_idf_diag', 'idf vector is not fitted')
             if not hasattr(self, '_dist_idf_diag'):
-                self._dist_idf_diag = Z._rdd.ctx.broadcast(self._idf_diag)
+                self._dist_idf_diag = Z._rdd.context.broadcast(self._idf_diag)
         return Z.transform(mapper, column='X')
