@@ -1,18 +1,13 @@
 import shutil
 import tempfile
+
 import numpy as np
-import scipy.sparse as sp
-
-from nose.tools import assert_equal
-from nose.tools import assert_true
-from numpy.testing import assert_array_almost_equal
-
-from sklearn.datasets import make_blobs
-from sklearn.cluster import KMeans
-
 from common import SplearnTestCase
-from splearn.rdd import ArrayRDD, TupleRDD
+from numpy.testing import assert_array_almost_equal
+from sklearn.cluster import KMeans
+from sklearn.datasets import make_blobs
 from splearn.cluster import SparkKMeans
+from splearn.rdd import ArrayRDD
 
 
 class ClusterKMeansTestCase(SplearnTestCase):
@@ -37,8 +32,8 @@ class TestKMeans(ClusterKMeansTestCase):
     def test_same_centroids(self):
         X, y, X_rdd = self.generate_dataset(centers=4, n_samples=200000)
 
-        local = KMeans(n_clusters=4, init='k-means++')
-        dist = SparkKMeans(n_clusters=4, init='k-means++')
+        local = KMeans(n_clusters=4, init='k-means++', random_state=42)
+        dist = SparkKMeans(n_clusters=4, init='k-means++', random_state=42)
 
         local.fit(X)
         dist.fit(X_rdd)
@@ -51,8 +46,8 @@ class TestKMeans(ClusterKMeansTestCase):
     def test_kmeans_parallel(self):
         X, y, X_rdd = self.generate_dataset(centers=4, n_samples=200000)
 
-        local = KMeans(n_clusters=4, init='k-means++')
-        dist = SparkKMeans(n_clusters=4, init='k-means||')
+        local = KMeans(n_clusters=4, init='k-means++', random_state=42)
+        dist = SparkKMeans(n_clusters=4, init='k-means||', random_state=42)
 
         local.fit(X)
         dist.fit(X_rdd)
