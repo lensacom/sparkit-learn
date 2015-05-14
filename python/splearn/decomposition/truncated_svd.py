@@ -81,23 +81,23 @@ def svd_em(blocked_rdd, k, maxiter=20, tol=1e-6, seed=None):
     n, m = blocked_rdd.shape[:2]
     sc = blocked_rdd._rdd.context
 
-    global run_sum
-
-    def accumsum(x):
-        global run_sum
-        run_sum += x
-
     def outerprod(x):
         return x.T.dot(x)
 
-    class MatrixAccum(AccumulatorParam):
+    # global run_sum
 
-        def zero(self, value):
-            return np.zeros(np.shape(value))
+    # def accumsum(x):
+    #     global run_sum
+    #     run_sum += x
 
-        def addInPlace(self, val1, val2):
-            val1 += val2
-            return val1
+    # class MatrixAccum(AccumulatorParam):
+
+    #     def zero(self, value):
+    #         return np.zeros(np.shape(value))
+
+    #     def addInPlace(self, val1, val2):
+    #         val1 += val2
+    #         return val1
 
     if seed is not None:
         rng = np.random.RandomState(seed)
@@ -119,28 +119,28 @@ def svd_em(blocked_rdd, k, maxiter=20, tol=1e-6, seed=None):
         premult1 = sc.broadcast(c_inv)
 
         # compute (xx')^-1 through a map reduce
-        # xx = blocked_rdd.map(lambda x: outerprod(safe_sparse_dot(x, premult1.value))) \
-        #                 .treeReduce(add)
+        xx = blocked_rdd.map(lambda x: outerprod(safe_sparse_dot(x, premult1.value))) \
+                        .treeReduce(add)
 
         # compute (xx')^-1 using an accumulator
-        run_sum = sc.accumulator(np.zeros((k, k)), MatrixAccum())
-        blocked_rdd.map(lambda x: outerprod(safe_sparse_dot(x, premult1.value))) \
-                   .foreachPartition(lambda l: accumsum(sum(l)))
-        xx = run_sum.value
+        # run_sum = sc.accumulator(np.zeros((k, k)), MatrixAccum())
+        # blocked_rdd.map(lambda x: outerprod(safe_sparse_dot(x, premult1.value))) \
+        #            .foreachPartition(lambda l: accumsum(sum(l)))
+        # xx = run_sum.value
         xx_inv = ln.inv(xx)
 
         # pre compute (cc')^-1 c (xx')^-1
         premult2 = blocked_rdd._rdd.context.broadcast(np.dot(c_inv, xx_inv))
 
         # compute the new c through a map reduce
-        # c = blocked_rdd.map(lambda x: safe_sparse_dot(x.T, safe_sparse_dot(x, premult2.value))) \
-        #                .treeReduce(add)
+        c = blocked_rdd.map(lambda x: safe_sparse_dot(x.T, safe_sparse_dot(x, premult2.value))) \
+                       .treeReduce(add)
 
         # compute the new c using an accumulator
-        run_sum = sc.accumulator(np.zeros((m, k)), MatrixAccum())
-        blocked_rdd.map(lambda x: safe_sparse_dot(x.T, safe_sparse_dot(x, premult2.value))) \
-                   .foreachPartition(lambda l: accumsum(sum(l)))
-        c = run_sum.value
+        # run_sum = sc.accumulator(np.zeros((m, k)), MatrixAccum())
+        # blocked_rdd.map(lambda x: safe_sparse_dot(x.T, safe_sparse_dot(x, premult2.value))) \
+        #            .foreachPartition(lambda l: accumsum(sum(l)))
+        # c = run_sum.value
         c = c.T
 
         error = np.sum((c - c_old) ** 2)
