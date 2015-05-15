@@ -2,7 +2,7 @@ from operator import add
 
 import numpy as np
 import scipy.linalg as ln
-from pyspark import AccumulatorParam
+# from pyspark import AccumulatorParam
 from sklearn.decomposition import TruncatedSVD
 from sklearn.utils.extmath import safe_sparse_dot
 
@@ -151,7 +151,7 @@ def svd_em(blocked_rdd, k, maxiter=20, tol=1e-6, seed=None):
     c = ln.orth(c.T).T
     cov = blocked_rdd.map(lambda x: safe_sparse_dot(x, c.T)) \
                      .map(lambda x: outerprod(x)) \
-                     .reduce(add)
+                     .treeReduce(add)
     w, v = ln.eig(cov / n)
     w = np.real(w)
     v = np.real(v)
