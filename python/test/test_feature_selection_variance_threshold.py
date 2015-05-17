@@ -82,8 +82,6 @@ class TestVarianceThreshold(FeatureSelectionTestCase):
 
         X, X_rdd = self.generate_sparse_dataset()
         result_local = local.fit_transform(X)
-        print result_local.shape
         result_dist = sp.vstack(dist.fit_transform(X_rdd).collect())
-        print result_dist.shape
         assert_array_almost_equal(result_local.toarray(),
                                   result_dist.toarray())

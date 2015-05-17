@@ -17,10 +17,11 @@ from sklearn.preprocessing import normalize
 from sklearn.utils.fixes import frombuffer_empty
 from sklearn.utils.validation import check_is_fitted
 
+from ..base import SparkBroadcasterMixin
 from ..rdd import ArrayRDD, DictRDD
 
 
-class SparkCountVectorizer(CountVectorizer):
+class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
 
     """Distributed implementation of CountVectorizer.
 
@@ -290,10 +291,10 @@ class SparkCountVectorizer(CountVectorizer):
         # create and broadcast vocabulary
         X = A[:, 'X'] if isinstance(A, DictRDD) else A
         vocabulary = self._init_vocab(X)
-        dist_vocab = A._rdd.context.broadcast(vocabulary)
+        bc_vocab = A._rdd.context.broadcast(vocabulary)
 
         # transform according to vocabulary
-        Z = A.transform(lambda X: self._count_vocab(X, dist_vocab), column='X')
+        Z = A.transform(lambda X: self._count_vocab(X, bc_vocab), column='X')
         Z = Z.persist()
         A.unpersist()
 
@@ -328,7 +329,7 @@ class SparkCountVectorizer(CountVectorizer):
 
             # set state
             self.vocabulary_ = vocabulary
-            self.dist_vocab_ = Z._rdd.context.broadcast(vocabulary)
+            self._unbroadcast('vocabulary')
 
         return Z
 
@@ -353,13 +354,11 @@ class SparkCountVectorizer(CountVectorizer):
 
         self._check_vocabulary()
 
-        if not hasattr(self, 'dist_vocab_'):
-            self.dist_vocab_ = Z._rdd.context.broadcast(self.vocabulary_)
-
+        vocab = self._broadcast(Z._rdd.ctx, 'vocabulary', self.vocabulary_)
         analyze = self.build_analyzer()
         Z = Z.transform(lambda X: map(analyze, X), column='X') \
              .transform(
-            lambda X: self._count_vocab(X, self.dist_vocab_), column='X')
+            lambda X: self._count_vocab(X, vocab), column='X')
 
         return Z
 
@@ -493,7 +492,7 @@ class SparkHashingVectorizer(HashingVectorizer):
     fit_transform = transform
 
 
-class SparkTfidfTransformer(TfidfTransformer):
+class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
 
     """Distributed implementation of TfidfTransformer.
 
@@ -541,8 +540,6 @@ class SparkTfidfTransformer(TfidfTransformer):
                    Press, pp. 118-120.`
     """
 
-    __transient__ = ['_idf_diag']  # cloudpickle won't serialize
-
     def fit(self, Z):
         """Learn the idf vector (global term weights)
 
@@ -556,10 +553,10 @@ class SparkTfidfTransformer(TfidfTransformer):
         self : TfidfVectorizer
         """
 
-        def mapper(X):
+        def mapper(X, use_idf=self.use_idf):
             if not sp.issparse(X):
                 X = sp.csc_matrix(X)
-            if self.use_idf:
+            if use_idf:
                 return _document_frequency(X)
 
         if self.use_idf:
@@ -583,8 +580,7 @@ class SparkTfidfTransformer(TfidfTransformer):
             idf = np.log(float(n_samples) / df) + 1.0
             self._idf_diag = sp.spdiags(idf,
                                         diags=0, m=n_features, n=n_features)
-            if hasattr(self, '_dist_idf_diag'):
-                del self._dist_idf_diag
+            self._unbroadcast('idf_diag')
         return self
 
     def transform(self, Z):
@@ -601,7 +597,15 @@ class SparkTfidfTransformer(TfidfTransformer):
         -------
         Z : ArrayRDD/DictRDD containing sparse matrices
         """
-        def mapper(X):
+
+        if self.use_idf:
+            check_is_fitted(self, '_idf_diag', 'idf vector is not fitted')
+            idf_diag = self._broadcast(Z._rdd.ctx, 'idf_diag', self._idf_diag)
+        else:
+            idf_diag = None
+
+        def mapper(X, use_idf=self.use_idf, sublinear_tf=self.sublinear_tf,
+                   idf_diag=idf_diag, norm=self.norm):
             if hasattr(X, 'dtype') and np.issubdtype(X.dtype, np.float):
                 # preserve float family dtype
                 X = sp.csr_matrix(X, copy=False)
@@ -611,26 +615,22 @@ class SparkTfidfTransformer(TfidfTransformer):
 
             n_samples, n_features = X.shape
 
-            if self.sublinear_tf:
+            if sublinear_tf:
                 np.log(X.data, X.data)
                 X.data += 1
 
-            if self.use_idf:
-                expected_n_features = self._dist_idf_diag.value.shape[0]
+            if use_idf:
+                expected_n_features = idf_diag.value.shape[0]
                 if n_features != expected_n_features:
                     raise ValueError("Input has n_features=%d while the model"
                                      " has been trained with n_features=%d" % (
                                          n_features, expected_n_features))
                 # *= doesn't work
-                X = X * self._dist_idf_diag.value
+                X = X * idf_diag.value
 
-            if self.norm:
-                X = normalize(X, norm=self.norm, copy=False)
+            if norm:
+                X = normalize(X, norm=norm, copy=False)
 
             return X
 
-        if self.use_idf:
-            check_is_fitted(self, '_idf_diag', 'idf vector is not fitted')
-            if not hasattr(self, '_dist_idf_diag'):
-                self._dist_idf_diag = Z._rdd.context.broadcast(self._idf_diag)
         return Z.transform(mapper, column='X')

@@ -1,10 +1,40 @@
 # -*- coding: utf-8 -*-
 
-from sklearn.base import ClassifierMixin
+
+from pyspark.broadcast import Broadcast
+from sklearn.base import BaseEstimator, ClassifierMixin, TransformerMixin
 from sklearn.metrics import accuracy_score
 
 
+class SparkBroadcasterMixin(object):
+
+    def __init__(self):
+        self._broadcasts = {}
+
+    def __getstate__(self):
+        return {k: v for k, v in self.__dict__.iteritems()
+                if not isinstance(v, Broadcast)}
+
+    def _broadcast(self, sc, key, value):
+        key = "_broadcasted_{0}".format(key)
+        if hasattr(self, key):
+            return getattr(self, key)
+
+        setattr(self, key, sc.broadcast(value() if callable(value) else value))
+        return getattr(self, key)
+
+    def _unbroadcast(self, key):
+        key = "_broadcasted_{0}".format(key)
+        if hasattr(self, key):
+            delattr(self, key)
+
+
+class SparkBaseEstimator(BaseEstimator):
+    pass
+
+
 class SparkClassifierMixin(ClassifierMixin):
+
     """Mixin class for all classifiers in sparkit-learn."""
 
     def score(self, Z):
@@ -14,3 +44,29 @@ class SparkClassifierMixin(ClassifierMixin):
         return accuracy_score(y.toarray(),
                               self.predict(X).toarray(),
                               sample_weight=w)
+
+
+class SparkTransformerMixin(TransformerMixin):
+
+    """Mixin class for all transformers in sparkit-learn."""
+
+    def fit_transform(self, Z, **fit_params):
+        """Fit to data, then transform it.
+
+        Fits transformer to Z with optional parameters fit_params
+        and returns a transformed version of Z.
+
+        Parameters
+        ----------
+        Z : ArrayRDD or DictRDD
+            Training set.
+
+        Returns
+        -------
+        Z_new : ArrayRDD or DictRDD
+            Transformed array.
+
+        """
+        # non-optimized default implementation; override when a better
+        # method is possible
+        return self.fit(Z, **fit_params).transform(Z)

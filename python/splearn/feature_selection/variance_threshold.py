@@ -4,9 +4,10 @@ from sklearn.utils import check_array
 from sklearn.utils.sparsefuncs import mean_variance_axis
 
 from ..rdd import DictRDD
+from .base import SparkSelectorMixin
 
 
-class SparkVarianceThreshold(VarianceThreshold):
+class SparkVarianceThreshold(VarianceThreshold, SparkSelectorMixin):
 
     """Feature selector that removes all low-variance features.
 
@@ -76,6 +77,7 @@ class SparkVarianceThreshold(VarianceThreshold):
             return (n_ab, mean_ab, var_ab)
 
         _, _, self.variances_ = X.map(mapper).treeReduce(reducer)
+        self._unbroadcast('mask')
 
         if np.all(self.variances_ <= self.threshold):
             msg = "No feature in X meets the variance threshold {0:.5f}"
@@ -84,18 +86,3 @@ class SparkVarianceThreshold(VarianceThreshold):
             raise ValueError(msg.format(self.threshold))
 
         return self
-
-    def transform(self, X):
-        """Reduce X to the selected features.
-
-        Parameters
-        ----------
-        X : ArrayRDD of shape [n_samples, n_features]
-            The input samples.
-
-        Returns
-        -------
-        X_r : array of shape [n_samples, n_selected_features]
-            The input samples with only the selected features.
-        """
-        return X.map(super(SparkVarianceThreshold, self).transform)
