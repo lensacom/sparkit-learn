@@ -298,7 +298,7 @@ class SparkTruncatedSVD(TruncatedSVD):
             # TODO: raise warning non distributed
             return super(SparkTruncatedSVD, self).fit_transform(X.tosparse())
 
-    def transform(self, X):
+    def transform(self, Z):
         """Perform dimensionality reduction on X.
 
         Parameters
@@ -312,9 +312,9 @@ class SparkTruncatedSVD(TruncatedSVD):
             Reduced version of X. This will always be a dense array.
         """
         mapper = super(SparkTruncatedSVD, self).transform
-        return X.transform(mapper)
+        return Z.transform(mapper, column='X')
 
-    def inverse_transform(self, X):
+    def inverse_transform(self, Z):
         """Transform X back to its original space.
 
         Returns an array X_original whose transform would be X.
@@ -330,4 +330,4 @@ class SparkTruncatedSVD(TruncatedSVD):
             Note that this is always a dense array.
         """
         mapper = super(SparkTruncatedSVD, self).inverse_transform
-        return X.transform(mapper)
+        return Z.transform(mapper, column='X')
