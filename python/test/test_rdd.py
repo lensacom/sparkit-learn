@@ -416,10 +416,18 @@ class TestArrayRDD(SplearnTestCase):
         assert_array_equal(X1, X2)
 
     def test_sum(self):
-        data = np.arange(4000)
-        rdd = self.sc.parallelize(data.reshape((1000, 4)))
-        for axis in [None, 0, 1]:
-            assert_equal(ArrayRDD(rdd).sum(axis=axis), data.sum(axis=axis))
+        data = np.arange(4000).reshape((1000, 4))
+        rdd = self.sc.parallelize(data)
+        assert_equal(ArrayRDD(rdd).sum(), data.sum())
+        assert_array_equal(ArrayRDD(rdd).sum(axis=0), data.sum(axis=0))
+        assert_array_equal(ArrayRDD(rdd).sum(axis=1), data.sum(axis=1))
+
+        data = np.arange(6000).reshape((1000, 3, 2))
+        rdd = self.sc.parallelize(data)
+        assert_equal(ArrayRDD(rdd).sum(), data.sum())
+        assert_array_equal(ArrayRDD(rdd).sum(axis=0), data.sum(axis=0))
+        assert_array_equal(ArrayRDD(rdd).sum(axis=1), data.sum(axis=1))
+        assert_array_equal(ArrayRDD(rdd).sum(axis=2), data.sum(axis=2))
 
     def test_dot(self):
         a = np.arange(400).reshape(20, 20)

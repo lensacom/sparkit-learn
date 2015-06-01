@@ -306,6 +306,7 @@ class ArrayRDD(BlockRDD):
     @property
     def shape(self):
         """Returns the shape of the data."""
+        # TODO cache
         first = self.first().shape
         shape = self._rdd.map(lambda x: x.shape[0]).sum()
         return (shape,) + first[1:]
@@ -314,6 +315,22 @@ class ArrayRDD(BlockRDD):
         """Returns the data as numpy.array from each partition."""
         return np.concatenate(self.collect())
 
+    def sum(self, axis=None):
+        def _unpack(blocks):
+            if sp.issparse(blocks[0]):
+                return sp.vstack(blocks)
+            else:
+                return np.concatenate(blocks)
+
+        if axis in (None, 0):
+            return self._rdd.map(lambda x: x.sum(axis=axis)).sum()
+        else:
+            blocks = self._rdd.map(lambda x: x.sum(axis=axis)).collect()
+            return _unpack(blocks)
+
+    def dot(other):
+        pass
+
     # def tosparse(self):
     #     return sp.vstack(self.collect())
 
@@ -321,7 +338,7 @@ class ArrayRDD(BlockRDD):
     #     return TupleRDD(self._rdd.cartesian(other._rdd), False)
 
 
-class TupleRDD(ArrayRDD):
+class TupleRDD(BlockRDD):
 
     """Distributed tuple data structure.
 
@@ -452,9 +469,6 @@ class TupleRDD(ArrayRDD):
         """
         return np.array(self.unblock().collect())
 
-    def tosparse(self):
-        raise NotImplementedError("Ambigious in case of multiple columns.")
-
     def transform(self, f, column=None):
         """Execute a transformation on a column or columns. Returns the modified
         TupleRDD.
@@ -537,7 +551,7 @@ class DictRDD(TupleRDD):
     [array([5, 6, 7, 8, 9]), array([10, 11, 12, 13, 14])]
     """
 
-    def __init__(self, rdd, columns, block_size=None, dtype=None):
+    def __init__(self, rdd, columns=None, block_size=None, dtype=None):
         super(DictRDD, self).__init__(rdd, block_size, dtype)
         if not hasattr(columns, "__iter__"):
             raise ValueError("Columns parameter must be iterable!")
