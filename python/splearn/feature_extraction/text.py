@@ -550,7 +550,7 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
     @property
     def _idf_diag(self):  # use broadcasted variable
         if isinstance(self._bc_idf_diag, Broadcast):
-            return self._bc_idf_diag.values
+            return self._bc_idf_diag.value
         else:
             return self._bc_idf_diag
 
