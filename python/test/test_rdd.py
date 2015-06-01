@@ -24,6 +24,14 @@ def assert_equal_multiple_tuples(tpls1, tpls2):
         assert_equal_tuple(tpl1, tpls2[i])
 
 
+def unpack(rdd):
+    blocks = rdd.collect()
+    if sp.issparse(blocks[0]):
+        return sp.vstack(blocks)
+    else:
+        return np.concatenate(blocks)
+
+
 class TestBlocking(SplearnTestCase):
 
     def test_empty(self):
@@ -445,17 +453,13 @@ class TestArrayRDD(SplearnTestCase):
         a = np.arange(200).reshape(20, 10)
         b = np.arange(200).reshape(10, 20)
         a_rdd = ArrayRDD(self.sc.parallelize(a))
-        assert_array_almost_equal(a_rdd.dot(b), a.dot(b))
+        assert_array_almost_equal(unpack(a_rdd.dot(b)), a.dot(b))
 
     def test_dot_sparse(self):
         a, a_rdd = self.generate_sparse_dataset(shape=(10, 20))
         b = sp.rand(20, 10, random_state=2, density=0.1)
-        assert_array_almost_equal(a_rdd.dot(b).toarray(), a.dot(b).toarray())
-
-    def test_dot_block(self):
-        a, a_rdd = self.generate_sparse_dataset(shape=(10, 20))
-        b, b_rdd = self.generate_sparse_dataset(shape=(20, 10))
-        assert_array_almost_equal(a_rdd.dot(b_rdd).toarray(), a.dot(b).toarray())
+        assert_array_almost_equal(unpack(a_rdd.dot(b)).toarray(),
+                                  a.dot(b).toarray())
 
 
 class TestTupleRDD(SplearnTestCase):

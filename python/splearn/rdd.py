@@ -329,8 +329,7 @@ class ArrayRDD(BlockRDD):
             return _unpack(blocks)
 
     def dot(self, other):
-        blocks = self._rdd.map(lambda x: x.dot(other)).collect()
-        return sp.vstack(blocks) if sp.issparse(blocks[0]) else np.concatenate(blocks)
+        return self.map(lambda x: x.dot(other))
 
     # def tosparse(self):
     #     return sp.vstack(self.collect())
