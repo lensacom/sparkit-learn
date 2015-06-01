@@ -8,7 +8,7 @@ from nose.tools import (assert_equal, assert_is_instance, assert_raises,
                         assert_true)
 from numpy.testing import assert_array_equal
 from pyspark import RDD
-from sklearn.utils.testing import assert_array_almost_equal
+from sklearn.utils.testing import assert_array_almost_equal, assert_almost_equal
 from splearn.rdd import ArrayRDD, BlockRDD, TupleRDD, block
 
 
@@ -428,6 +428,18 @@ class TestArrayRDD(SplearnTestCase):
         assert_array_equal(ArrayRDD(rdd).sum(axis=0), data.sum(axis=0))
         assert_array_equal(ArrayRDD(rdd).sum(axis=1), data.sum(axis=1))
         assert_array_equal(ArrayRDD(rdd).sum(axis=2), data.sum(axis=2))
+
+    def test_sum_sparse(self):
+        data, rdd = self.generate_sparse_dataset()
+        assert_almost_equal(ArrayRDD(rdd).sum(), data.sum())
+        assert_array_almost_equal(ArrayRDD(rdd).sum(axis=0), data.sum(axis=0))
+        assert_array_almost_equal(ArrayRDD(rdd).sum(axis=1), data.sum(axis=1))
+
+    def generate_sparse_dataset(self, shape=(1e3, 10), block_size=None):
+        data = sp.rand(shape[0], shape[1], random_state=2, density=0.1)
+        X = [sp.csr_matrix([row]) for row in data.toarray()]
+        X_rdd = ArrayRDD(self.sc.parallelize(X, 4), block_size)
+        return data, X_rdd
 
     def test_dot(self):
         a = np.arange(400).reshape(20, 20)
