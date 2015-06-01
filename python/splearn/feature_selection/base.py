@@ -4,6 +4,7 @@
 from abc import ABCMeta
 
 import numpy as np
+from pyspark import Broadcast
 from scipy.sparse import csc_matrix, issparse
 from sklearn.externals import six
 from sklearn.feature_selection.base import SelectorMixin
@@ -24,6 +25,42 @@ class SparkSelectorMixin(six.with_metaclass(ABCMeta, SelectorMixin,
     `_get_support_mask`.
     """
 
+    @property
+    def support_mask_(self):
+        if not hasattr(self, '_bc_support_mask'):
+            return self._get_support_mask()
+        elif isinstance(self._bc_support_mask, Broadcast):
+            return self._bc_support_mask.value
+        else:
+            return self._bc_support_mask
+
+    @support_mask_.setter
+    def support_mask_(self, value):
+        self._bc_support_mask = value
+
+    def get_support(self, indices=False):
+        """
+        Get a mask, or integer index, of the features selected
+
+        Parameters
+        ----------
+        indices : boolean (default False)
+            If True, the return value will be an array of integers, rather
+            than a boolean mask.
+
+        Returns
+        -------
+        support : array
+            An index that selects the retained features from a feature vector.
+            If `indices` is False, this is a boolean array of shape
+            [# input features], in which an element is True iff its
+            corresponding feature is selected for retention. If `indices` is
+            True, this is an integer array of shape [# output features] whose
+            values are indices into the input feature vector.
+        """
+        mask = self.support_mask_
+        return mask if not indices else np.where(mask)[0]
+
     def transform(self, Z):
         """Reduce X to the selected features.
 
@@ -37,15 +74,8 @@ class SparkSelectorMixin(six.with_metaclass(ABCMeta, SelectorMixin,
         X_r : array of shape [n_samples, n_selected_features]
             The input samples with only the selected features.
         """
-        support_mask = self._broadcast(Z._rdd.ctx, 'mask', self.get_support)
-
-        def mapper(X, mask=support_mask):
-            X = check_array(X, accept_sparse='csr')
-            if len(mask.value) != X.shape[1]:
-                raise ValueError("X has a different shape than during fitting.")
-            return check_array(X, accept_sparse='csr')[:, safe_mask(X, mask.value)]
-
-        return Z.transform(mapper, column='X')
+        self._broadcast(Z.context, '_bc_support_mask', self._get_support_mask())
+        return Z.transform(super(SparkSelectorMixin, self).transform, column='X')
 
     def inverse_transform(self, Z):
         raise NotImplementedError("Inverse transformation hasn't been implemented yet.")

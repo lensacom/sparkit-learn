@@ -7,14 +7,16 @@ import scipy.sparse as sp
 from pyspark.rdd import RDD
 
 
-def _pack_accumulated(accumulated):
-    if len(accumulated) > 0 and sp.issparse(accumulated[0]):
+def _pack_accumulated(accumulated, dtype=None):
+    if dtype is not None:
+        return dtype(accumulated)
+    elif len(accumulated) > 0 and sp.issparse(accumulated[0]):
         return sp.vstack(accumulated)
     else:
         return np.array(accumulated)
 
 
-def _block_tuple(iterator, block_size=None):
+def _block_tuple(iterator, block_size=None, dtypes=None):
     """Pack rdd of tuples as tuples of arrays or scipy.sparse matrices."""
     i = 0
     blocked_tuple = None
@@ -23,32 +25,41 @@ def _block_tuple(iterator, block_size=None):
             blocked_tuple = tuple([] for _ in range(len(tuple_i)))
 
         if block_size is not None and i >= block_size:
-            yield tuple(_pack_accumulated(x) for x in blocked_tuple)
+            if dtypes is None:
+                yield tuple(_pack_accumulated(x) for x in blocked_tuple)
+            else:
+                yield tuple(_pack_accumulated(x, dtype)
+                            for x, dtype in zip(blocked_tuple, dtypes))
             blocked_tuple = tuple([] for _ in range(len(tuple_i)))
             i = 0
+
         for x_j, x in zip(tuple_i, blocked_tuple):
             x.append(x_j)
         i += 1
     if i > 0:
-        yield tuple(_pack_accumulated(x) for x in blocked_tuple)
+        if dtypes is None:
+            yield tuple(_pack_accumulated(x) for x in blocked_tuple)
+        else:
+            yield tuple(_pack_accumulated(x, dtype)
+                        for x, dtype in zip(blocked_tuple, dtypes))
 
 
-def _block_collection(iterator, block_size=None):
+def _block_collection(iterator, block_size=None, dtype=None):
     """Pack rdd with a specific collection constructor."""
     i = 0
     accumulated = []
     for a in iterator:
         if block_size is not None and i >= block_size:
-            yield _pack_accumulated(accumulated)
+            yield _pack_accumulated(accumulated, dtype)
             accumulated = []
             i = 0
         accumulated.append(a)
         i += 1
     if i > 0:
-        yield _pack_accumulated(accumulated)
+        yield _pack_accumulated(accumulated, dtype)
 
 
-def block(rdd, block_size=None):
+def block(rdd, block_size=None, dtype=None):
     """Block an RDD
 
     Parameters
@@ -79,14 +90,150 @@ def block(rdd, block_size=None):
     # do different kinds of block depending on the type
     if isinstance(entry, dict):
         rdd = rdd.map(lambda x: x.values())
-        return DictRDD(rdd, entry.keys(), block_size)
+        return DictRDD(rdd, entry.keys(), block_size, dtype)
     elif isinstance(entry, tuple):
-        return TupleRDD(rdd, block_size)
+        return TupleRDD(rdd, block_size, dtype)
     else:  # Fallback to array packing
-        return ArrayRDD(rdd, block_size)
+        return ArrayRDD(rdd, block_size, dtype)
 
 
-class ArrayRDD(object):
+class BlockRDD(object):
+
+    def __init__(self, rdd, block_size=None, dtype=list):
+        self.block_size = block_size
+        if isinstance(rdd, BlockRDD):
+            self._rdd = rdd._rdd
+        elif isinstance(rdd, RDD):
+            if block_size is False:
+                self._rdd = rdd
+            else:
+                self._rdd = self._block(rdd, block_size, dtype)
+        else:
+            raise TypeError(
+                "Unexpected type {0} for parameter rdd".format(type(rdd)))
+
+    def _block(self, rdd, block_size, dtype):
+        """Execute the blocking process on the given rdd.
+
+        Parameters
+        ----------
+        rdd : pyspark.rdd.RDD
+            Distributed data to block
+        block_size : int or None
+            The desired size of the blocks
+
+        Returns
+        -------
+        rdd : pyspark.rdd.RDD
+            Blocked rdd.
+        """
+        return rdd.mapPartitions(
+            lambda x: _block_collection(x, block_size, dtype))
+
+    def __repr__(self):
+        """Returns a string representation of the ArrayRDD.
+        """
+        return "{0} from {1}".format(self.__class__, repr(self._rdd))
+
+    def __getattr__(self, attr):
+        """Access pyspark.rdd.RDD methods or attributes.
+
+        Parameters
+        ----------
+        attr : method or attribute
+            The method/attribute to access
+
+        Returns
+        -------
+        result : method or attribute
+            The result of the requested method or attribute casted to ArrayRDD
+            if method/attribute is available, else raises AttributeError.
+        """
+        def bypass(*args, **kwargs):
+            result = getattr(self._rdd, attr)(*args, **kwargs)
+            if isinstance(result, RDD):
+                if result is not self._rdd:
+                    return BlockRDD(result, False)
+                else:
+                    return self
+            return result
+
+        if not hasattr(self._rdd, attr):
+            raise AttributeError("{0} object has no attribute {1}".format(
+                                 self.__class__, attr))
+        return bypass
+
+    def __getitem__(self, index):
+        """Returns the selected blocks defined by index parameter.
+
+        Parameter
+        ---------
+        index : int or slice
+            The key of the block or the range of the blocks.
+
+        Returns
+        -------
+        block : ArrayRDD
+            The selected block(s).
+        """
+        if isinstance(index, tuple):
+            raise IndexError("Too many indices for BlockRDD")
+        elif isinstance(index, slice) and index == slice(None, None, None):
+            return self
+
+        indices = np.arange(self.blocks)[index]
+        indexed = self._rdd.zipWithIndex()
+        if isinstance(index, slice):
+            ascending = index.step is None or index.step > 0
+            rdd = indexed.filter(lambda (x, i): i in indices)
+            if not ascending:
+                rdd = rdd.sortBy(lambda (x, i): i, ascending)
+        elif hasattr(index, "__iter__"):
+            # TODO: check monotoniticity to avoid unnunnecessary sorting
+            arg = indices.tolist()
+            rdd = indexed.filter(lambda (x, i): i in indices) \
+                         .sortBy(lambda (x, i): arg.index(i))
+        elif isinstance(index, int):
+            rdd = indexed.filter(lambda (x, i): i == indices)
+        else:
+            raise KeyError("Unexpected type of index: {0}".format(type(index)))
+
+        return self.__class__(rdd.map(lambda (x, i): x), False)
+
+    def __len__(self):
+        """Returns the number of elements in all blocks."""
+        return self._rdd.map(len).sum()
+
+    @property
+    def context(self):
+        return self._rdd.ctx
+
+    @property
+    def blocks(self):  # numblocks?
+        """Returns the number of blocks."""
+        return self._rdd.count()
+
+    @property
+    def partitions(self):  # numpart?
+        """Returns the number of partitions in the rdd."""
+        return self._rdd.getNumPartitions()
+
+    def unblock(self):
+        """Flattens the blocks. Returns as list."""
+        return self._rdd.flatMap(lambda x: list(x))
+
+    def tolist(self):
+        """Flattens the blocks. Returns as list."""
+        return self.unblock().collect()
+
+    def transform(self, f, *args, **kwargs):
+        """Equivalent to map, compatibility purpose only.
+        Column parameter ignored.
+        """
+        return self.map(f)
+
+
+class ArrayRDD(BlockRDD):
 
     """A distributed array data structure.
 
@@ -133,68 +280,8 @@ class ArrayRDD(object):
 
     """
 
-    def __init__(self, rdd, block_size=None):
-        self.block_size = block_size
-        if isinstance(rdd, ArrayRDD):
-            self._rdd = rdd._rdd
-        elif isinstance(rdd, RDD):
-            if block_size is False:
-                self._rdd = rdd
-            else:
-                self._rdd = self._block(rdd, block_size)
-        else:
-            raise TypeError(
-                "Unexpected type {0} for parameter rdd".format(type(rdd)))
-
-    def _block(self, rdd, block_size):
-        """Execute the blocking process on the given rdd.
-
-        Parameters
-        ----------
-        rdd : pyspark.rdd.RDD
-            Distributed data to block
-        block_size : int or None
-            The desired size of the blocks
-
-        Returns
-        -------
-        rdd : pyspark.rdd.RDD
-            Blocked rdd.
-        """
-        return rdd.mapPartitions(lambda x: _block_collection(x, block_size))
-
-    def __getattr__(self, attr):
-        """Access pyspark.rdd.RDD methods or attributes.
-
-        Parameters
-        ----------
-        attr : method or attribute
-            The method/attribute to access
-
-        Returns
-        -------
-        result : method or attribute
-            The result of the requested method or attribute casted to ArrayRDD
-            if method/attribute is available, else raises AttributeError.
-        """
-        def bypass(*args, **kwargs):
-            result = getattr(self._rdd, attr)(*args, **kwargs)
-            if isinstance(result, RDD):
-                if result is not self._rdd:
-                    return ArrayRDD(result, False)
-                else:
-                    return self
-            return result
-
-        if not hasattr(self._rdd, attr):
-            raise AttributeError("{0} object has no attribute {1}".format(
-                                 self.__class__, attr))
-        return bypass
-
-    def __repr__(self):
-        """Returns a string representation of the ArrayRDD.
-        """
-        return "{0} from {1}".format(self.__class__, repr(self._rdd))
+    def __init__(self, rdd, block_size=None, dtype=list):
+        super(ArrayRDD, self).__init__(rdd, block_size, dtype=None)
 
     def __getitem__(self, key):
         """Access a specified block.
@@ -209,95 +296,29 @@ class ArrayRDD(object):
         block : ArrayRDD
             The selected block(s).
         """
-        return self.ix(key)
-
-    def __len__(self):
-        """Returns the number of blocks."""
-        return self.count()
-
-    def ix(self, index):
-        """Returns the selected blocks defined by index parameter.
-
-        Parameter
-        ---------
-        index : int or slice
-            The key of the block or the range of the blocks.
-
-        Returns
-        -------
-        block : ArrayRDD
-            The selected block(s).
-        """
-        if isinstance(index, tuple):
-            raise IndexError("Too many indices for ArrayRDD")
-        elif isinstance(index, slice) and index == slice(None, None, None):
-            return self
-
-        indices = np.arange(self.count())[index]
-        indexed = self.zipWithIndex()
-        if isinstance(index, slice):
-            ascending = index.step is None or index.step > 0
-            rdd = indexed.filter(lambda (x, i): i in indices)
-            if not ascending:
-                rdd = rdd.sortBy(lambda (x, i): i, ascending)
-        elif hasattr(index, "__iter__"):
-            # TODO: check monotoniticity to avoid unnunnecessary sorting
-            arg = indices.tolist()
-            rdd = indexed.filter(lambda (x, i): i in indices) \
-                         .sortBy(lambda (x, i): arg.index(i))
-        elif isinstance(index, int):
-            rdd = indexed.filter(lambda (x, i): i == indices)
+        if isinstance(key, tuple):
+            index, mask = key[0], key[1:]
+            return super(ArrayRDD, self).__getitem__(index) \
+                                        .map(lambda x: x[mask])
         else:
-            raise KeyError("Unexpected type of index: {0}".format(type(index)))
-
-        return rdd.map(lambda (x, i): x)
-
-    @property
-    def partitions(self):  # numpart?
-        """Returns the number of partitions in the rdd.
-        """
-        return self._rdd.getNumPartitions()
-
-    @property
-    def blocks(self):
-        """Returns the number of blocks.
-        """
-        return self._rdd.count()
+            return super(ArrayRDD, self).__getitem__(key)
 
     @property
     def shape(self):
-        """Returns the shape of the data.
-        """
+        """Returns the shape of the data."""
         first = self.first().shape
-        shape = self._rdd.map(lambda x: x.shape[0]).reduce(operator.add)
+        shape = self._rdd.map(lambda x: x.shape[0]).sum()
         return (shape,) + first[1:]
 
-    def unblock(self):
-        """Flattens the blocks.
-        """
-        return self.flatMap(lambda x: list(x))
-
-    def tolist(self):
-        """Returns the data as lists from each partition.
-        """
-        return self.unblock().collect()
-
     def toarray(self):
-        """Returns the data as numpy.array from each partition.
-        """
+        """Returns the data as numpy.array from each partition."""
         return np.concatenate(self.collect())
 
-    def tosparse(self):
-        return sp.vstack(self.collect())
+    # def tosparse(self):
+    #     return sp.vstack(self.collect())
 
-    def transform(self, f, column=None):
-        """Equivalent to map, compatibility purpose only.
-        Column parameter ignored.
-        """
-        return self.map(f)
-
-    def cartesian(self, other):
-        return TupleRDD(self._rdd.cartesian(other._rdd), False)
+    # def cartesian(self, other):
+    #     return TupleRDD(self._rdd.cartesian(other._rdd), False)
 
 
 class TupleRDD(ArrayRDD):
@@ -352,7 +373,7 @@ class TupleRDD(ArrayRDD):
     [array([5, 6, 7, 8, 9]), array([10, 11, 12, 13, 14])]
     """
 
-    def _block(self, rdd, block_size):
+    def _block(self, rdd, block_size, dtype):
         """Execute the blocking process on the given rdd.
 
         Parameters
@@ -367,7 +388,7 @@ class TupleRDD(ArrayRDD):
         rdd : pyspark.rdd.RDD
             Blocked rdd.
         """
-        return rdd.mapPartitions(lambda x: _block_tuple(x, block_size))
+        return rdd.mapPartitions(lambda x: _block_tuple(x, block_size, dtype))
 
     def __getitem__(self, key):
         """Access a specified block.
@@ -384,23 +405,9 @@ class TupleRDD(ArrayRDD):
         """
         if isinstance(key, tuple):  # get first index
             index, key = key
-            return self.ix(index).get(key)
-        return self.ix(key)
-
-    def ix(self, index):
-        """Returns the selected blocks defined by index parameter.
-
-        Parameter
-        ---------
-        index : int or slice
-            The key of the block or the range of the blocks.
-
-        Returns
-        -------
-        block : TupleRDD
-            The selected block(s).
-        """
-        return TupleRDD(super(TupleRDD, self).ix(index))
+            return super(TupleRDD, self).__getitem__(index).get(key)
+        else:
+            return super(TupleRDD, self).__getitem__(key)
 
     def get(self, key):
         if isinstance(key, tuple):
@@ -433,7 +440,7 @@ class TupleRDD(ArrayRDD):
     def unblock(self):
         """Flattens the blocks.
         """
-        return self.flatMap(lambda cols: zip(*cols))
+        return self._rdd.flatMap(lambda cols: zip(*cols))
 
     def tolist(self):
         """Returns the data as lists from each partition.
@@ -530,8 +537,8 @@ class DictRDD(TupleRDD):
     [array([5, 6, 7, 8, 9]), array([10, 11, 12, 13, 14])]
     """
 
-    def __init__(self, rdd, columns, block_size=None):
-        super(DictRDD, self).__init__(rdd, block_size)
+    def __init__(self, rdd, columns, block_size=None, dtype=None):
+        super(DictRDD, self).__init__(rdd, block_size, dtype)
         if not hasattr(columns, "__iter__"):
             raise ValueError("Columns parameter must be iterable!")
         elif not all([isinstance(k, basestring) for k in columns]):

@@ -1,11 +1,10 @@
 # encoding: utf-8
 
 import numpy as np
+from pyspark.mllib.clustering import KMeans as MLlibKMeans
+from sklearn.cluster import KMeans
 
 from ..rdd import ArrayRDD, DictRDD
-
-from sklearn.cluster import KMeans
-from pyspark.mllib.clustering import KMeans as MLlibKMeans
 
 
 class SparkKMeans(KMeans):
@@ -83,7 +82,7 @@ class SparkKMeans(KMeans):
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
         if self.init == 'k-means||':
             self._mllib_model = MLlibKMeans.train(
-                X.unblock()._rdd,
+                X.unblock(),
                 self.n_clusters,
                 maxIterations=self.max_iter,
                 initializationMode="k-means||")

@@ -77,7 +77,6 @@ class SparkVarianceThreshold(VarianceThreshold, SparkSelectorMixin):
             return (n_ab, mean_ab, var_ab)
 
         _, _, self.variances_ = X.map(mapper).treeReduce(reducer)
-        self._unbroadcast('mask')
 
         if np.all(self.variances_ <= self.threshold):
             msg = "No feature in X meets the variance threshold {0:.5f}"

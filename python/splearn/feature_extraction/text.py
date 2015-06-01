@@ -7,7 +7,7 @@ from itertools import chain
 import numpy as np
 import scipy.sparse as sp
 import six
-from pyspark import AccumulatorParam
+from pyspark import AccumulatorParam, Broadcast
 from sklearn.feature_extraction.text import (CountVectorizer,
                                              HashingVectorizer,
                                              TfidfTransformer,
@@ -134,7 +134,16 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
     HashingVectorizer, TfidfVectorizer
     """
 
-    __transient__ = ['vocabulary_']  # cloudpickle won't serialize
+    @property
+    def vocabulary_(self):
+        if isinstance(self._bc_vocabulary, Broadcast):
+            return self._bc_vocabulary.value
+        else:
+            return self._bc_vocabulary
+
+    @vocabulary_.setter
+    def vocabulary_(self, value):
+        self._bc_vocabulary = value
 
     def _init_vocab(self, analyzed_docs):
         """Create vocabulary
@@ -161,10 +170,10 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
                              " contain stop words")
         return vocabulary
 
-    def _count_vocab(self, analyzed_docs, broadcasted_vocab):
+    def _count_vocab(self, analyzed_docs):
         """Create sparse feature matrix, and vocabulary where fixed_vocab=False
         """
-        vocabulary = broadcasted_vocab.value
+        vocabulary = self.vocabulary_
         j_indices = _make_int_array()
         indptr = _make_int_array()
         indptr.append(0)
@@ -291,10 +300,10 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
         # create and broadcast vocabulary
         X = A[:, 'X'] if isinstance(A, DictRDD) else A
         vocabulary = self._init_vocab(X)
-        bc_vocab = A._rdd.context.broadcast(vocabulary)
+        self._broadcast(A.context, '_bc_vocabulary', vocabulary)
 
         # transform according to vocabulary
-        Z = A.transform(lambda X: self._count_vocab(X, bc_vocab), column='X')
+        Z = A.transform(lambda X: self._count_vocab(X), column='X')
         Z = Z.persist()
         A.unpersist()
 
@@ -325,11 +334,10 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
             # combined mask
             mask = kept_indices[map_index]
 
-            Z = Z.transform(lambda x: x[:, mask], column='X')
-
             # set state
             self.vocabulary_ = vocabulary
-            self._unbroadcast('vocabulary')
+
+            Z = Z.transform(lambda x: x[:, mask], column='X')
 
         return Z
 
@@ -353,12 +361,11 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
             self._validate_vocabulary()
 
         self._check_vocabulary()
+        self._broadcast(Z.context, '_bc_vocabulary')
 
-        vocab = self._broadcast(Z._rdd.ctx, 'vocabulary', self.vocabulary_)
         analyze = self.build_analyzer()
         Z = Z.transform(lambda X: map(analyze, X), column='X') \
-             .transform(
-            lambda X: self._count_vocab(X, vocab), column='X')
+             .transform(lambda X: self._count_vocab(X), column='X')
 
         return Z
 
@@ -540,6 +547,17 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
                    Press, pp. 118-120.`
     """
 
+    @property
+    def _idf_diag(self):  # use broadcasted variable
+        if isinstance(self._bc_idf_diag, Broadcast):
+            return self._bc_idf_diag.values
+        else:
+            return self._bc_idf_diag
+
+    @_idf_diag.setter
+    def _idf_diag(self, value):
+        self._bc_idf_diag = value
+
     def fit(self, Z):
         """Learn the idf vector (global term weights)
 
@@ -553,6 +571,8 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
         self : TfidfVectorizer
         """
 
+        X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
+
         def mapper(X, use_idf=self.use_idf):
             if not sp.issparse(X):
                 X = sp.csc_matrix(X)
@@ -560,14 +580,6 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
                 return _document_frequency(X)
 
         if self.use_idf:
-            if isinstance(Z, DictRDD):
-                X = Z[:, 'X']
-            elif isinstance(Z, ArrayRDD):
-                X = Z
-            else:
-                raise TypeError(
-                    "Expected DictRDD or ArrayRDD, given {0}".format(type(Z)))
-
             n_samples, n_features = X.shape
             df = X.map(mapper).treeReduce(operator.add)
 
@@ -580,7 +592,6 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
             idf = np.log(float(n_samples) / df) + 1.0
             self._idf_diag = sp.spdiags(idf,
                                         diags=0, m=n_features, n=n_features)
-            self._unbroadcast('idf_diag')
         return self
 
     def transform(self, Z):
@@ -599,38 +610,8 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
         """
 
         if self.use_idf:
-            check_is_fitted(self, '_idf_diag', 'idf vector is not fitted')
-            idf_diag = self._broadcast(Z._rdd.ctx, 'idf_diag', self._idf_diag)
-        else:
-            idf_diag = None
+            check_is_fitted(self, '_bc_idf_diag', 'idf vector is not fitted')
+            self._broadcast(Z.context, '_bc_idf_diag')
 
-        def mapper(X, use_idf=self.use_idf, sublinear_tf=self.sublinear_tf,
-                   idf_diag=idf_diag, norm=self.norm):
-            if hasattr(X, 'dtype') and np.issubdtype(X.dtype, np.float):
-                # preserve float family dtype
-                X = sp.csr_matrix(X, copy=False)
-            else:
-                # convert counts or binary occurrences to floats
-                X = sp.csr_matrix(X, dtype=np.float64, copy=False)
-
-            n_samples, n_features = X.shape
-
-            if sublinear_tf:
-                np.log(X.data, X.data)
-                X.data += 1
-
-            if use_idf:
-                expected_n_features = idf_diag.value.shape[0]
-                if n_features != expected_n_features:
-                    raise ValueError("Input has n_features=%d while the model"
-                                     " has been trained with n_features=%d" % (
-                                         n_features, expected_n_features))
-                # *= doesn't work
-                X = X * idf_diag.value
-
-            if norm:
-                X = normalize(X, norm=norm, copy=False)
-
-            return X
-
+        mapper = super(SparkTfidfTransformer, self).transform
         return Z.transform(mapper, column='X')

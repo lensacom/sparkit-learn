@@ -112,18 +112,6 @@ class TestHashingVectorizer(FeatureExtractionTextTestCase):
 
 class TestTfidfTransformer(FeatureExtractionTextTestCase):
 
-    def test_same_idf_diag(self):
-        X, X_rdd = self.generate_dataset(4, 1000, None)
-
-        local = TfidfTransformer()
-        dist = SparkTfidfTransformer()
-
-        local.fit(X)
-        dist.fit(X_rdd)
-
-        assert_array_almost_equal(local._idf_diag.toarray(),
-                                  dist._idf_diag.toarray())
-
     def test_same_transform_result(self):
         X, X_rdd = self.generate_dataset(4, 1000, None)
 
