@@ -415,6 +415,18 @@ class TestArrayRDD(SplearnTestCase):
 
         assert_array_equal(X1, X2)
 
+    def test_sum(self):
+        data = np.arange(4000)
+        rdd = self.sc.parallelize(data.reshape((1000, 4)))
+        for axis in [None, 0, 1]:
+            assert_equal(ArrayRDD(rdd).sum(axis=axis), data.sum(axis=axis))
+
+    def test_dot(self):
+        a = np.arange(400).reshape(20, 20)
+        b = np.arange(400).reshape(20, 20)
+        a_rdd, b_rdd = self.sc.parallelize(a), self.sc.parallelize(b)
+        assert_equal(a_rdd.dot(b_rdd), a.dot(b))
+
 
 class TestTupleRDD(SplearnTestCase):
 
@@ -435,19 +447,6 @@ class TestTupleRDD(SplearnTestCase):
         assert_is_instance(TupleRDD(rdd), ArrayRDD)
         assert_is_instance(TupleRDD(rdd, None), TupleRDD)
         assert_is_instance(TupleRDD(rdd), ArrayRDD)
-
-    def test_shape(self):
-        data = np.arange(4000)
-        shapes = [(1000, 4),
-                  (200, 20),
-                  (100, 40),
-                  (2000, 2)]
-        for shape in shapes:
-            rdd = self.sc.parallelize(data.reshape(shape))
-            rdd1 = rdd.zipWithIndex()
-            rdd2 = rdd.map(lambda x: (x, 1, 2, 3, 4, True))
-            assert_equal(TupleRDD(rdd1).shape, (shape[0], 2))
-            assert_equal(TupleRDD(rdd2).shape, (shape[0], 6))
 
     def test_get_single_tuple(self):
         x, y = np.arange(80).reshape((40, 2)), np.arange(40)
