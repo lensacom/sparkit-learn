@@ -442,10 +442,20 @@ class TestArrayRDD(SplearnTestCase):
         return data, X_rdd
 
     def test_dot(self):
-        a = np.arange(400).reshape(20, 20)
-        b = np.arange(400).reshape(20, 20)
-        a_rdd, b_rdd = self.sc.parallelize(a), self.sc.parallelize(b)
-        assert_equal(a_rdd.dot(b_rdd), a.dot(b))
+        a = np.arange(200).reshape(20, 10)
+        b = np.arange(200).reshape(10, 20)
+        a_rdd = ArrayRDD(self.sc.parallelize(a))
+        assert_array_almost_equal(a_rdd.dot(b), a.dot(b))
+
+    def test_dot_sparse(self):
+        a, a_rdd = self.generate_sparse_dataset(shape=(10, 20))
+        b = sp.rand(20, 10, random_state=2, density=0.1)
+        assert_array_almost_equal(a_rdd.dot(b).toarray(), a.dot(b).toarray())
+
+    def test_dot_block(self):
+        a, a_rdd = self.generate_sparse_dataset(shape=(10, 20))
+        b, b_rdd = self.generate_sparse_dataset(shape=(20, 10))
+        assert_array_almost_equal(a_rdd.dot(b_rdd).toarray(), a.dot(b).toarray())
 
 
 class TestTupleRDD(SplearnTestCase):
