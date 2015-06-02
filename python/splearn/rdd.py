@@ -230,7 +230,7 @@ class BlockRDD(object):
         """Equivalent to map, compatibility purpose only.
         Column parameter ignored.
         """
-        return self.map(f)
+        return self.__class__(self._rdd.map(f), block_size=False)
 
 
 class ArrayRDD(BlockRDD):
@@ -329,6 +329,7 @@ class ArrayRDD(BlockRDD):
             return _unpack(blocks)
 
     def dot(self, other):
+        # TODO naive dot implementation with another ArrayRDD
         return self.map(lambda x: x.dot(other))
 
     # def tosparse(self):

@@ -5,8 +5,10 @@ import scipy.linalg as ln
 # from pyspark import AccumulatorParam
 from sklearn.decomposition import TruncatedSVD
 from sklearn.utils.extmath import safe_sparse_dot
+from pyspark import Broadcast
 
 from ..rdd import DictRDD
+from ..base import SparkBroadcasterMixin
 
 
 def svd(blocked_rdd, k):
@@ -49,7 +51,7 @@ def svd(blocked_rdd, k):
     return u, s, v
 
 
-def svd_em(blocked_rdd, k, maxiter=20, tol=1e-6, seed=None):
+def svd_em(blocked_rdd, k, maxiter=20, tol=1e-6, compute_u=True, seed=None):
     """
     Calculate the SVD of a blocked RDD using an expectation maximization
     algorithm (from Roweis, NIPS, 1997) that avoids explicitly
@@ -130,7 +132,7 @@ def svd_em(blocked_rdd, k, maxiter=20, tol=1e-6, seed=None):
         xx_inv = ln.inv(xx)
 
         # pre compute (cc')^-1 c (xx')^-1
-        premult2 = blocked_rdd._rdd.context.broadcast(np.dot(c_inv, xx_inv))
+        premult2 = blocked_rdd.context.broadcast(np.dot(c_inv, xx_inv))
 
         # compute the new c through a map reduce
         c = blocked_rdd.map(lambda x: safe_sparse_dot(x.T, safe_sparse_dot(x, premult2.value))) \
@@ -158,12 +160,16 @@ def svd_em(blocked_rdd, k, maxiter=20, tol=1e-6, seed=None):
     inds = np.argsort(w)[::-1]
     s = np.sqrt(w[inds[0:k]]) * np.sqrt(n)
     v = np.dot(v[:, inds[0:k]].T, c)
-    u = blocked_rdd.map(lambda x: safe_sparse_dot(x, v.T) / s)
+    if compute_u:
+        v_broadcasted = blocked_rdd.context.broadcast(v)
+        u = blocked_rdd.map(
+            lambda x: safe_sparse_dot(x, v_broadcasted.value.T) / s)
+        return u, s, v
+    else:
+        return s, v
 
-    return u, s, v
 
-
-class SparkTruncatedSVD(TruncatedSVD):
+class SparkTruncatedSVD(TruncatedSVD, SparkBroadcasterMixin):
 
     """Dimensionality reduction using truncated SVD (aka LSA).
 
@@ -249,6 +255,17 @@ class SparkTruncatedSVD(TruncatedSVD):
 
     """
 
+    @property
+    def components_(self):
+        if isinstance(self._bc_components, Broadcast):
+            return self._bc_components.value
+        else:
+            return self._bc_components
+
+    @components_.setter
+    def components_(self, value):
+        self._bc_components = value
+
     def __init__(self, n_components=2, algorithm="em", n_iter=30,
                  random_state=None, tol=1e-7):
         super(SparkTruncatedSVD, self).__init__(
@@ -288,12 +305,12 @@ class SparkTruncatedSVD(TruncatedSVD):
 
         if self.algorithm == "em":
             X = X.persist()  # boosting iterative svm
-            U, Sigma, V = svd_em(X, k=self.n_components, maxiter=self.n_iter,
-                                 tol=self.tol, seed=self.random_state)
+            Sigma, V = svd_em(X, k=self.n_components, maxiter=self.n_iter,
+                              tol=self.tol, compute_u=False,
+                              seed=self.random_state)
             self.components_ = V
             X.unpersist()
-            # return transformed data
-            return U.transform(lambda x: np.dot(x, np.diag(Sigma)))
+            return self.transform(Z)
         else:
             # TODO: raise warning non distributed
             return super(SparkTruncatedSVD, self).fit_transform(X.tosparse())
@@ -311,6 +328,7 @@ class SparkTruncatedSVD(TruncatedSVD):
         X_new : array, shape (n_samples, n_components)
             Reduced version of X. This will always be a dense array.
         """
+        self._broadcast(Z.context, '_bc_components')
         mapper = super(SparkTruncatedSVD, self).transform
         return Z.transform(mapper, column='X')
 
