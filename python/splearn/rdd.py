@@ -329,8 +329,8 @@ class ArrayRDD(BlockRDD):
         if axis in (None, 0):
             return self._rdd.map(lambda x: x.sum(axis=axis)).sum()
         else:
-            blocks = self._rdd.map(lambda x: x.sum(axis=axis)).collect()
-            return _unpack_blocks(blocks)
+            return self._rdd.map(lambda x: x.sum(axis=axis)) \
+                            .reduce(lambda a, b: _unpack_blocks([a, b]))
 
     def dot(self, other):
         # TODO naive dot implementation with another ArrayRDD
