@@ -315,22 +315,29 @@ class ArrayRDD(BlockRDD):
         """Returns the data as numpy.array from each partition."""
         return np.concatenate(self.collect())
 
-    def sum(self, axis=None):
-        def _unpack(blocks):
-            if sp.issparse(blocks[0]):
-                return sp.vstack(blocks)
-            else:
-                return np.concatenate(blocks)
+    def _unpack(self, blocks):
+        if sp.issparse(blocks[0]):
+            return sp.vstack(blocks)
+        else:
+            return np.concatenate(blocks)
 
+    def sum(self, axis=None):
         if axis in (None, 0):
             return self._rdd.map(lambda x: x.sum(axis=axis)).sum()
         else:
             blocks = self._rdd.map(lambda x: x.sum(axis=axis)).collect()
-            return _unpack(blocks)
+            return self._unpack(blocks)
 
     def dot(self, other):
         # TODO naive dot implementation with another ArrayRDD
         return self.map(lambda x: x.dot(other))
+
+    def mean(self, axis=None):
+        if axis in (None, 0):
+            return self._rdd.map(lambda x: x.mean(axis=axis)).sum() / self._rdd.count()
+        else:
+            blocks = self._rdd.map(lambda x: x.mean(axis=axis)).collect()
+            return self._unpack(blocks)
 
     # def tosparse(self):
     #     return sp.vstack(self.collect())

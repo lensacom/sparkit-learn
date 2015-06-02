@@ -461,6 +461,19 @@ class TestArrayRDD(SplearnTestCase):
         assert_array_almost_equal(unpack(a_rdd.dot(b)).toarray(),
                                   a.dot(b).toarray())
 
+    def test_mean(self):
+        data = np.arange(6000).reshape((1000, 3, 2))
+        rdd = self.sc.parallelize(data)
+        assert_equal(ArrayRDD(rdd).mean(), data.mean())
+        assert_array_equal(ArrayRDD(rdd).mean(axis=0), data.mean(axis=0))
+        assert_array_equal(ArrayRDD(rdd).mean(axis=1), data.mean(axis=1))
+
+    def test_mean_sparse(self):
+        data, rdd = self.generate_sparse_dataset()
+        assert_almost_equal(ArrayRDD(rdd).mean(), data.mean())
+        assert_array_almost_equal(ArrayRDD(rdd).mean(axis=0), data.mean(axis=0))
+        assert_array_almost_equal(ArrayRDD(rdd).mean(axis=1), data.mean(axis=1))
+
 
 class TestTupleRDD(SplearnTestCase):
 
