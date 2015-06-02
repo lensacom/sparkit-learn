@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import operator
+import itertools
 
 import numpy as np
 import scipy.sparse as sp
@@ -16,19 +17,13 @@ def _pack_accumulated(accumulated, dtype=None):
         return np.array(accumulated)
 
 
-def _unpack_accumulated(blocks):
-    if sp.issparse(blocks[0]):
+def _unpack_blocks(blocks, dtype=None):
+    if dtype is not None:
+        dtype(itertools.chain(*blocks))
+    elif sp.issparse(blocks[0]):
         return sp.vstack(blocks)
     else:
         return np.concatenate(blocks)
-
-
-def _size_of_block(block):
-    if sp.issparse(block):
-        x, y = block.shape
-        return x * y
-    else:
-        return block.size
 
 
 def _block_tuple(iterator, block_size=None, dtypes=None):
@@ -335,22 +330,31 @@ class ArrayRDD(BlockRDD):
             return self._rdd.map(lambda x: x.sum(axis=axis)).sum()
         else:
             blocks = self._rdd.map(lambda x: x.sum(axis=axis)).collect()
-            return _unpack_accumulated(blocks)
+            return _unpack_blocks(blocks)
 
     def dot(self, other):
         # TODO naive dot implementation with another ArrayRDD
         return self.map(lambda x: x.dot(other))
 
     def mean(self, axis=None):
-        _get_size = lambda x: _size_of_block(x) if axis is None else x.shape[axis]
-        if axis in (None, 0):
-            reducer = lambda x, y: (x[0] + y[0], x[1] + y[1])
-            (sum_, size) = self._rdd.map(lambda x: (x.sum(axis=axis), _get_size(x))).treeReduce(reducer)
-            return sum_ / float(size)
-        else:
-            reducer = lambda x, y: (_unpack_accumulated([x[0], y[0]]), x[1] + y[1], x[2] + y[2])
-            (sum_, size, cnt) = self._rdd.map(lambda x: (x.sum(axis=axis), _get_size(x), 1)).treeReduce(reducer)
-            return sum_ / (float(size) / cnt)
+        def mapper(x):
+            """Calculate statistics for every numpy or scipy blocks."""
+            cnt = np.prod(x.shape) if axis is None else x.shape[axis]
+            return cnt, x.mean(axis=axis)
+
+        def reducer(a, b):
+            """Calculate the combined statistics."""
+            n_a, mean_a = a
+            n_b, mean_b = b
+            n_ab = n_a + n_b
+            if axis in (None, 0):
+                mean_ab = ((mean_a * n_a) + (mean_b * n_b)) / n_ab
+            else:
+                mean_ab = _unpack_blocks([mean_a, mean_b])
+            return n_ab, mean_ab
+
+        n, mean = self._rdd.map(mapper).treeReduce(reducer)
+        return mean
 
     # def tosparse(self):
     #     return sp.vstack(self.collect())
