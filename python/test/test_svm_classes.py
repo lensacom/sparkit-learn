@@ -9,7 +9,7 @@ from sklearn.datasets import make_classification
 from sklearn.svm import LinearSVC
 
 from common import SplearnTestCase
-from splearn.rdd import ArrayRDD, TupleRDD
+from splearn.rdd import DictRDD
 from splearn.svm import SparkLinearSVC
 
 
@@ -33,7 +33,7 @@ class SVMClassesTestCase(SplearnTestCase):
         X_rdd = self.sc.parallelize(X)
         y_rdd = self.sc.parallelize(y)
 
-        Z = TupleRDD(X_rdd.zip(y_rdd), blocks)
+        Z = DictRDD(X_rdd.zip(y_rdd), blocks)
 
         return X, y, Z
 

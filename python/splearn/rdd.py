@@ -102,7 +102,7 @@ def block(rdd, block_size=None, dtype=None):
         rdd = rdd.map(lambda x: x.values())
         return DictRDD(rdd, entry.keys(), block_size, dtype)
     elif isinstance(entry, tuple):
-        return TupleRDD(rdd, block_size, dtype)
+        return DictRDD(rdd, block_size, dtype)
     else:  # Fallback to array packing
         return ArrayRDD(rdd, block_size, dtype)
 
@@ -163,7 +163,7 @@ class BlockRDD(object):
             result = getattr(self._rdd, attr)(*args, **kwargs)
             if isinstance(result, RDD):
                 if result is not self._rdd:
-                    return BlockRDD(result, False)
+                    return BlockRDD(result, block_size=False)
                 else:
                     return self
             return result
@@ -208,7 +208,7 @@ class BlockRDD(object):
         else:
             raise KeyError("Unexpected type of index: {0}".format(type(index)))
 
-        return self.__class__(rdd.map(lambda (x, i): x), False)
+        return self.__class__(rdd.map(lambda (x, i): x), block_size=False)
 
     def __len__(self):
         """Returns the number of elements in all blocks."""
@@ -363,162 +363,7 @@ class ArrayRDD(BlockRDD):
     #     return TupleRDD(self._rdd.cartesian(other._rdd), False)
 
 
-class TupleRDD(BlockRDD):
-
-    """Distributed tuple data structure.
-
-    The tuple is stored as a tuple of numpy.arrays in each block. It works like
-    a column based data structure, each column can be transformed and accessed
-    independently.
-
-    Parameters
-    ----------
-    rdd : pyspark.rdd.RDD
-        A parallelized data container
-    block_size : {int, None, False} default to None
-        The number of entries to block together. If None, one block will be
-        created in every partition. If False, no blocking executed. Useful when
-        casting already blocked rdds.
-
-    Attributes
-    ----------
-    columns : int
-        Number of columns in the rdd
-    partitions : int
-        The number of partitions in the rdd
-    blocks : int
-        The number of blocks present in the rdd
-    shape : tuple
-        The dimensionality of the dataset
-    _rdd : pyspark.rdd.RDD
-        The underlying distributed data container
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> from splearn.rdd import TupleRDD
-    >>> data = np.array([range(20), range(2)*10])
-    >>> Z = TupleRDD(sc.parallelize(data.T), block_size=5)
-    >>> Z
-    <class 'splearn.rdd.TupleRDD'> from PythonRDD...
-
-    >>> Z.collect()
-    [(array([0, 1, 2, 3, 4]), array([0, 1, 0, 1, 0])),
-     (array([5, 6, 7, 8, 9]), array([1, 0, 1, 0, 1])),
-     (array([10, 11, 12, 13, 14]), array([0, 1, 0, 1, 0])),
-     (array([15, 16, 17, 18, 19]), array([1, 0, 1, 0, 1]))]
-
-    >>> Z.columns
-    2
-
-    >>> Z[1:-1, 0].collect()
-    [array([5, 6, 7, 8, 9]), array([10, 11, 12, 13, 14])]
-    """
-
-    def _block(self, rdd, block_size, dtype):
-        """Execute the blocking process on the given rdd.
-
-        Parameters
-        ----------
-        rdd : pyspark.rdd.RDD
-            Distributed data to block
-        block_size : int or None
-            The desired size of the blocks
-
-        Returns
-        -------
-        rdd : pyspark.rdd.RDD
-            Blocked rdd.
-        """
-        return rdd.mapPartitions(lambda x: _block_tuple(x, block_size, dtype))
-
-    def __getitem__(self, key):
-        """Access a specified block.
-
-        Parameters
-        ----------
-        key : int or slice
-            The key of the block or the range of the blocks.
-
-        Returns
-        -------
-        block : ArrayRDD or TupleRDD
-            The selected block(s).
-        """
-        if isinstance(key, tuple):  # get first index
-            index, key = key
-            return super(TupleRDD, self).__getitem__(index).get(key)
-        else:
-            return super(TupleRDD, self).__getitem__(key)
-
-    def get(self, key):
-        if isinstance(key, tuple):
-            raise IndexError("Too many indices for TupleRDD")
-        elif isinstance(key, slice):
-            if key == slice(None, None, None):
-                return self
-            rdd = self.map(lambda x: x[key])
-            return TupleRDD(rdd)
-        elif hasattr(key, "__iter__"):
-            rdd = self.map(lambda x: tuple(x[i] for i in key))
-            return TupleRDD(rdd)
-        elif isinstance(key, int):
-            return self.map(lambda x: x[key])
-        else:
-            raise KeyError("Unexpected type of key: {0}".format(type(key)))
-
-    @property
-    def columns(self):
-        """Returns the number of columns.
-        """
-        return len(self.first())
-
-    @property
-    def shape(self):
-        """Returns the shape of the data.
-        """
-        return (self.get(0).shape[0], self.columns)
-
-    def unblock(self):
-        """Flattens the blocks.
-        """
-        return self._rdd.flatMap(lambda cols: zip(*cols))
-
-    def tolist(self):
-        """Returns the data as lists from each partition.
-        """
-        return self.unblock().collect()
-
-    def toarray(self):
-        """Returns the data as numpy.array from each partition.
-        """
-        return np.array(self.unblock().collect())
-
-    def transform(self, f, column=None):
-        """Execute a transformation on a column or columns. Returns the modified
-        TupleRDD.
-
-        Parameters
-        ----------
-        f : function
-            The function to execute on the columns.
-        column : {int, list or None}
-            The column(s) to transform. If None is specified the method is
-            equivalent to map.
-
-        Returns
-        -------
-        result : TupleRDD
-            TupleRDD with transformed column(s).
-        """
-        if column is not None:
-            mapper = lambda x: x[:column] + (f(x[column]),) + x[column + 1:]
-        else:
-            mapper = f
-        return TupleRDD(self.map(mapper))
-
-
-class DictRDD(TupleRDD):
+class DictRDD(BlockRDD):
 
     """Distributed named tuple data structure.
 
@@ -578,47 +423,79 @@ class DictRDD(TupleRDD):
 
     def __init__(self, rdd, columns=None, block_size=None, dtype=None):
         super(DictRDD, self).__init__(rdd, block_size, dtype)
-        if not hasattr(columns, "__iter__"):
+        if columns is None:
+            columns = range(len(rdd.first()))
+        elif not hasattr(columns, "__iter__"):
             raise ValueError("Columns parameter must be iterable!")
-        elif not all([isinstance(k, basestring) for k in columns]):
-            raise ValueError("Every column must be a string!")
-        if len(columns) != len(self.first()):  # optional?
-            raise ValueError("Number of values doesn't match with columns!")
+        # elif not all([isinstance(k, basestring) for k in columns]):
+        #     raise ValueError("Every column must be a string!")
         if not len(columns) == len(set(columns)):
             raise ValueError("Column names must be unique!")
+        if len(columns) != len(self.first()):  # optional?
+            raise ValueError("Number of values doesn't match with columns!")
         self._cols = tuple(columns)  # TODO: unique
 
-    def ix(self, index):
-        """Returns the selected blocks defined by index parameter.
+    def _block(self, rdd, block_size, dtype):
+        """Execute the blocking process on the given rdd.
 
-        Parameter
-        ---------
-        index : int or slice
+        Parameters
+        ----------
+        rdd : pyspark.rdd.RDD
+            Distributed data to block
+        block_size : int or None
+            The desired size of the blocks
+
+        Returns
+        -------
+        rdd : pyspark.rdd.RDD
+            Blocked rdd.
+        """
+        return rdd.mapPartitions(lambda x: _block_tuple(x, block_size, dtype))
+
+    def __getitem__(self, key):
+        """Access a specified block.
+
+        Parameters
+        ----------
+        key : int or slice
             The key of the block or the range of the blocks.
 
         Returns
         -------
-        block : DictRDD
+        block : ArrayRDD or TupleRDD
             The selected block(s).
         """
-        return DictRDD(super(DictRDD, self).ix(index), columns=self._cols)
+        if isinstance(key, tuple):  # get first index
+            index, key = key
+            return super(DictRDD, self).__getitem__(index).get(key)
+        else:
+            return super(DictRDD, self).__getitem__(key)
 
     def get(self, key):
         if isinstance(key, tuple):
             raise IndexError("Too many indices for DictRDD")
-        elif isinstance(key, slice) and key == slice(None, None, None):
-            return self
+        elif isinstance(key, slice):
+            if key == slice(None, None, None):
+                return self
+            rdd = self._rdd.map(lambda x: x[key])
+            return DictRDD(rdd, columns=self._cols[key], block_size=False)
         elif hasattr(key, "__iter__"):
             if tuple(key) == self._cols:
                 return self
             indices = [self._cols.index(k) for k in key]
-            return DictRDD(super(DictRDD, self).get(indices), columns=key)
+            rdd = self._rdd.map(lambda x: tuple(x[i] for i in indices))
+            return DictRDD(rdd, columns=key, block_size=False)
         else:
             index = self._cols.index(key)
-            return super(DictRDD, self).get(index)
+            return self.map(lambda x: x[index])
 
     def __contains__(self, key):
         return key in self._cols
+
+    def unblock(self):
+        """Flattens the blocks.
+        """
+        return self._rdd.flatMap(lambda cols: zip(*cols))
 
     @property
     def columns(self):
@@ -651,5 +528,7 @@ class DictRDD(TupleRDD):
         """
         if column is not None:
             column = self._cols.index(column)
-        transformed = super(DictRDD, self).transform(f, column)
-        return DictRDD(transformed, columns=self._cols)
+            mapper = lambda x: x[:column] + (f(x[column]),) + x[column + 1:]
+        else:
+            mapper = f
+        return DictRDD(self.map(mapper), columns=self._cols)

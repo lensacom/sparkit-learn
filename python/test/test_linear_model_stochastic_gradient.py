@@ -11,7 +11,7 @@ from sklearn.datasets import make_classification
 from sklearn.linear_model import SGDClassifier
 
 from common import SplearnTestCase
-from splearn.rdd import ArrayRDD, DictRDD
+from splearn.rdd import DictRDD
 from splearn.linear_model import SparkSGDClassifier
 
 

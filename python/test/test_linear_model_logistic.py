@@ -11,7 +11,7 @@ from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 
 from common import SplearnTestCase
-from splearn.rdd import ArrayRDD, TupleRDD
+from splearn.rdd import DictRDD
 from splearn.linear_model import SparkLogisticRegression
 
 
@@ -35,7 +35,7 @@ class LinearModelLogisticTestCase(SplearnTestCase):
         X_rdd = self.sc.parallelize(X, 4)
         y_rdd = self.sc.parallelize(y, 4)
 
-        Z = TupleRDD(X_rdd.zip(y_rdd), blocks)
+        Z = DictRDD(X_rdd.zip(y_rdd), blocks)
 
         return X, y, Z
 
