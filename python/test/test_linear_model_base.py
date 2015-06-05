@@ -29,7 +29,7 @@ class LinearModelBaseTestCase(SplearnTestCase):
         X_rdd = self.sc.parallelize(X)
         y_rdd = self.sc.parallelize(y)
 
-        Z = DictRDD(X_rdd.zip(y_rdd), columns=('X', 'y'), block_size=blocks)
+        Z = DictRDD(X_rdd.zip(y_rdd), columns=('X', 'y'), bsize=blocks)
 
         return X, y, Z
 

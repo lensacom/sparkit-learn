@@ -96,7 +96,6 @@ class SparkLinearSVC(LinearSVC, SparkLinearModelMixin):
     def classes_(self, value):
         pass
 
-
     def fit(self, Z, classes=None):
         """Fit the model according to the given training data.
 

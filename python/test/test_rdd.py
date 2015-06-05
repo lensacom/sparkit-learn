@@ -83,17 +83,17 @@ class TestBlocking(SplearnTestCase):
         assert_equal(len(blocks), n_partitions)
         assert_equal(sum(len(b) for b in blocks), n_samples)
 
-    def test_array_block_size(self):
+    def test_array_bsize(self):
         n_partitions = 10
         n_samples = 107
         data = self.sc.parallelize([np.array([1]) for i in range(n_samples)],
                                    n_partitions)
 
-        block_data_5 = block(data, block_size=5)
+        block_data_5 = block(data, bsize=5)
         blocks = block_data_5.collect()
         assert_true(all(len(b) <= 5 for b in blocks))
 
-        block_data_10 = block(data, block_size=10)
+        block_data_10 = block(data, bsize=10)
         blocks = block_data_10.collect()
         assert_true(all(len(b) <= 10 for b in blocks))
 
@@ -140,7 +140,7 @@ class TestBlocking(SplearnTestCase):
         dicts = [{'a': i, 'b': float(i) ** 2} for i in range(n_samples)]
         data = self.sc.parallelize(dicts, n_partitions)
 
-        block_data_5 = block(data, block_size=5)
+        block_data_5 = block(data, bsize=5)
         blocks = block_data_5.collect()
         assert_true(all(len(b) <= 5 for b in blocks))
         assert_array_almost_equal(blocks[0][0], np.arange(5))
@@ -161,7 +161,7 @@ class TestBlockRDD(SplearnTestCase):
         assert_equal(blocked.first(), range(10))
         assert_equal(blocked.collect(), np.arange(100).reshape(10, 10).tolist())
 
-        blocked = BlockRDD(rdd, block_size=4)
+        blocked = BlockRDD(rdd, bsize=4)
         assert_is_instance(blocked, BlockRDD)
         assert_equal(blocked.first(), range(4))
         assert_equal([len(x) for x in blocked.collect()], [4, 4, 2] * 10)
@@ -190,21 +190,21 @@ class TestBlockRDD(SplearnTestCase):
         assert_equal(len(blocked), 62)
 
     def test_blocks_number(self):
-        blocked = BlockRDD(self.generate(1000), block_size=50)
+        blocked = BlockRDD(self.generate(1000), bsize=50)
         assert_equal(blocked.blocks, 20)
-        blocked = BlockRDD(self.generate(621), block_size=45)
+        blocked = BlockRDD(self.generate(621), bsize=45)
         assert_equal(blocked.blocks, 20)
-        blocked = BlockRDD(self.generate(100), block_size=4)
+        blocked = BlockRDD(self.generate(100), bsize=4)
         assert_equal(blocked.blocks, 30)
-        blocked = BlockRDD(self.generate(79, 2), block_size=9)
+        blocked = BlockRDD(self.generate(79, 2), bsize=9)
         assert_equal(blocked.blocks, 10)
-        blocked = BlockRDD(self.generate(89, 2), block_size=5)
+        blocked = BlockRDD(self.generate(89, 2), bsize=5)
         assert_equal(blocked.blocks, 18)
 
     def test_partition_number(self):
-        blocked = BlockRDD(self.generate(1000, 5), block_size=50)
+        blocked = BlockRDD(self.generate(1000, 5), bsize=50)
         assert_equal(blocked.partitions, 5)
-        blocked = BlockRDD(self.generate(621, 3), block_size=45)
+        blocked = BlockRDD(self.generate(621, 3), bsize=45)
         assert_equal(blocked.partitions, 3)
         blocked = BlockRDD(self.generate(100, 10))
         assert_equal(blocked.partitions, 10)
@@ -274,7 +274,7 @@ class TestArrayRDD(SplearnTestCase):
         data = [np.array([1, 2]) for i in range(n_samples)]
         rdd = self.sc.parallelize(data, n_partitions)
 
-        assert_equal(1000, ArrayRDD(rdd, False).blocks)
+        assert_equal(1000, ArrayRDD(rdd, noblock=True, bsize=1).blocks)
         assert_equal(10, ArrayRDD(rdd).blocks)
         assert_equal(20, ArrayRDD(rdd, 50).blocks)
         assert_equal(20, ArrayRDD(rdd, 66).blocks)
@@ -443,10 +443,10 @@ class TestArrayRDD(SplearnTestCase):
         assert_array_almost_equal(ArrayRDD(rdd).sum(axis=0), data.sum(axis=0))
         assert_array_almost_equal(ArrayRDD(rdd).sum(axis=1), data.sum(axis=1))
 
-    def generate_sparse_dataset(self, shape=(1e3, 10), block_size=None):
+    def generate_sparse_dataset(self, shape=(1e3, 10), bsize=None):
         data = sp.rand(shape[0], shape[1], random_state=2, density=0.1)
         X = [sp.csr_matrix([row]) for row in data.toarray()]
-        X_rdd = ArrayRDD(self.sc.parallelize(X, 4), block_size)
+        X_rdd = ArrayRDD(self.sc.parallelize(X, 4), bsize)
         return data, X_rdd
 
     def test_dot(self):
@@ -485,14 +485,14 @@ class TestDictRDD(SplearnTestCase):
         rdd = self.sc.parallelize(data, n_partitions)
 
         assert_raises(TypeError, DictRDD, data)
-        assert_raises(TypeError, DictRDD, data, block_size=False)
-        assert_raises(TypeError, DictRDD, data, block_size=10)
+        assert_raises(TypeError, DictRDD, data, bsize=False)
+        assert_raises(TypeError, DictRDD, data, bsize=10)
 
         assert_is_instance(DictRDD(rdd), DictRDD)
         assert_is_instance(DictRDD(rdd), BlockRDD)
-        assert_is_instance(DictRDD(rdd, block_size=10), DictRDD)
+        assert_is_instance(DictRDD(rdd, bsize=10), DictRDD)
         assert_is_instance(DictRDD(rdd), BlockRDD)
-        assert_is_instance(DictRDD(rdd, block_size=None), DictRDD)
+        assert_is_instance(DictRDD(rdd, bsize=None), DictRDD)
         assert_is_instance(DictRDD(rdd), BlockRDD)
 
     def test_get_single_tuple(self):
@@ -500,7 +500,7 @@ class TestDictRDD(SplearnTestCase):
         x_rdd = self.sc.parallelize(x, 2)
         y_rdd = self.sc.parallelize(y, 2)
         z_rdd = x_rdd.zip(y_rdd)
-        z = DictRDD(z_rdd, block_size=5)
+        z = DictRDD(z_rdd, bsize=5)
 
         expected = np.arange(0, 10).reshape((5, 2)), np.arange(5)
         for tpl in [z.first(), z[0].first(), z[0].first()]:
@@ -519,7 +519,7 @@ class TestDictRDD(SplearnTestCase):
         x_rdd = self.sc.parallelize(x, 2)
         y_rdd = self.sc.parallelize(y, 2)
         z_rdd = x_rdd.zip(y_rdd)
-        z = DictRDD(z_rdd, block_size=5)
+        z = DictRDD(z_rdd, bsize=5)
 
         assert_array_equal(z[0, 0].first(), np.arange(0, 10).reshape((5, 2)))
         assert_array_equal(z[0, 1].first(), np.arange(5))
@@ -538,7 +538,7 @@ class TestDictRDD(SplearnTestCase):
         x_rdd = self.sc.parallelize(x, 2)
         y_rdd = self.sc.parallelize(y, 2)
         z_rdd = x_rdd.zip(y_rdd)
-        z = DictRDD(z_rdd, block_size=5)
+        z = DictRDD(z_rdd, bsize=5)
 
         expected = [(np.arange(0, 10).reshape((5, 2)), np.arange(0, 5)),
                     (np.arange(10, 20).reshape((5, 2)), np.arange(5, 10))]
@@ -565,7 +565,7 @@ class TestDictRDD(SplearnTestCase):
         x_rdd = self.sc.parallelize(x, 2)
         y_rdd = self.sc.parallelize(y, 2)
         z_rdd = x_rdd.zip(y_rdd)
-        z = DictRDD(z_rdd, block_size=5)
+        z = DictRDD(z_rdd, bsize=5)
         print z.collect()
 
         expected = [(np.arange(0, 10).reshape((5, 2)), np.arange(0, 5)),

@@ -36,7 +36,7 @@ class LinearModelStochasticGradientTestCase(SplearnTestCase):
         y_rdd = self.sc.parallelize(y, 4)
         Z_rdd = X_rdd.zip(y_rdd)
 
-        Z = DictRDD(Z_rdd, columns=('X', 'y'), block_size=blocks)
+        Z = DictRDD(Z_rdd, columns=('X', 'y'), bsize=blocks)
 
         return X, y, Z
 
