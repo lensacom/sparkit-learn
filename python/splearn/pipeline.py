@@ -3,11 +3,11 @@
 import numpy as np
 import scipy.sparse as sp
 
-from sklearn.externals.joblib import Parallel, delayed
-
 from sklearn.externals import six
 from sklearn.pipeline import Pipeline
 from sklearn.pipeline import FeatureUnion
+from sklearn.externals.joblib import Parallel, delayed
+from sklearn.pipeline import _name_estimators
 
 from splearn.rdd import ArrayRDD, DictRDD
 
@@ -155,9 +155,6 @@ def _transform_one(transformer, name, Z, transformer_weights):
         if isinstance(Z, DictRDD):
             return transformer.transform(Z).transform(
                 lambda x: x * transformer_weights[name], 'X')
-        # elif isinstance(Z, TupleRDD):
-        #     return transformer.transform(Z).transform(
-        #         lambda x: x * transformer_weights[name], 0)
         else:
             return transformer.transform(Z).map(
                 lambda x: x * transformer_weights[name])
@@ -176,9 +173,6 @@ def _fit_transform_one(transformer, name, Z, transformer_weights,
         if isinstance(Z, DictRDD):
             Z_transformed.transform(
                 lambda x: x * transformer_weights[name], 'X')
-        # elif isinstance(Z, TupleRDD):
-        #     Z_transformed.transform(
-        #         lambda x: x * transformer_weights[name], 0)
         else:
             Z_transformed.map(lambda x: x * transformer_weights[name])
 
@@ -246,16 +240,11 @@ class SparkFeatureUnion(FeatureUnion):
         self._update_transformer_list(transformers)
 
         X = reduce(lambda x, y: x.zip(y._rdd), Zs)
-        issparse = False
         for item in X.first():
             if sp.issparse(item):
                 issparse = True
-                break
-        if issparse:
-            X = X.map(lambda x: sp.hstack(x))
-        else:
-            X = X.map(lambda x: np.hstack(x))
-        return X
+                return X.map(lambda x: sp.hstack(x))
+        X = X.map(lambda x: np.hstack(x))
 
     def transform(self, Z):
         """TODO: rewrite docstring
@@ -273,16 +262,10 @@ class SparkFeatureUnion(FeatureUnion):
         Zs = [_transform_one(trans, name, Z, self.transformer_weights)
               for name, trans in self.transformer_list]
         X = reduce(lambda x, y: x.zip(y._rdd), Zs)
-        issparse = False
         for item in X.first():
             if sp.issparse(item):
-                issparse = True
-                break
-        if issparse:
-            X = X.map(lambda x: sp.hstack(x))
-        else:
-            X = X.map(lambda x: np.hstack(x))
-        return X
+                return X.map(lambda x: sp.hstack(x))
+        return X.map(lambda x: np.hstack(x))
 
     def get_params(self, deep=True):
         if not deep:
@@ -296,27 +279,25 @@ class SparkFeatureUnion(FeatureUnion):
             return out
 
 
-# # XXX it would be nice to have a keyword-only n_jobs argument to this function,
-# # but that's not allowed in Python 2.x.
-# def make_union(*transformers):
-#     """Construct a FeatureUnion from the given transformers.
-#     This is a shorthand for the FeatureUnion constructor; it does not require,
-#     and does not permit, naming the transformers. Instead, they will be given
-#     names automatically based on their types. It also does not allow weighting.
-#     Examples
-#     --------
-#     >>> from sklearn.decomposition import PCA, TruncatedSVD
-#     >>> make_union(PCA(), TruncatedSVD())    # doctest: +NORMALIZE_WHITESPACE
-#     FeatureUnion(n_jobs=1,
-#                  transformer_list=[('pca', PCA(copy=True, n_components=None,
-#                                                whiten=False)),
-#                                    ('truncatedsvd',
-#                                     TruncatedSVD(algorithm='randomized',
-#                                                  n_components=2, n_iter=5,
-#                                                  random_state=None, tol=0.0))],
-#                  transformer_weights=None)
-#     Returns
-#     -------
-#     f : FeatureUnion
-#     """
-#     return FeatureUnion(_name_estimators(transformers))
+def make_sparkunion(*transformers):
+    """Construct a FeatureUnion from the given transformers.
+    This is a shorthand for the FeatureUnion constructor; it does not require,
+    and does not permit, naming the transformers. Instead, they will be given
+    names automatically based on their types. It also does not allow weighting.
+    Examples
+    --------
+    >>> from sklearn.decomposition import PCA, TruncatedSVD
+    >>> make_union(PCA(), TruncatedSVD())    # doctest: +NORMALIZE_WHITESPACE
+    FeatureUnion(n_jobs=1,
+                 transformer_list=[('pca', PCA(copy=True, n_components=None,
+                                               whiten=False)),
+                                   ('truncatedsvd',
+                                    TruncatedSVD(algorithm='randomized',
+                                                 n_components=2, n_iter=5,
+                                                 random_state=None, tol=0.0))],
+                 transformer_weights=None)
+    Returns
+    -------
+    f : FeatureUnion
+    """
+    return SparkFeatureUnion(_name_estimators(transformers))

@@ -12,15 +12,22 @@ from sklearn.utils.testing import assert_false
 from sklearn.utils.testing import assert_true
 from sklearn.utils.testing import assert_array_equal
 from sklearn.utils.testing import assert_array_almost_equal
-from sklearn.datasets import load_iris
+from sklearn.datasets import make_classification
+#from sklearn.datasets import load_iris
 
 from sklearn.pipeline import Pipeline, FeatureUnion
-from splearn.pipeline import SparkPipeline, SparkFeatureUnion
+from splearn.pipeline import SparkPipeline, SparkFeatureUnion, make_sparkunion
 
 from sklearn.feature_extraction.text import CountVectorizer
 from splearn.feature_extraction.text import SparkCountVectorizer
 
+from sklearn.linear_model.logistic import LogisticRegression
+from splearn.linear_model.logistic import SparkLogisticRegression
+
+from sklearn.feature_selection import VarianceThreshold
 from splearn.feature_selection import SparkVarianceThreshold
+
+from splearn.decomposition import SparkTruncatedSVD
 
 from splearn.rdd import ArrayRDD, DictRDD
 
@@ -48,15 +55,32 @@ class PipelineTestCase(SplearnTestCase):
         Z = ArrayRDD(Z_rdd, block_size=blocks)
         return X, Z
 
-    def generate_iris(self, blocks=None):
-        iris = load_iris()
-        X = iris.data
-        X -= X.mean(axis=0)
-        y = iris.target
-        X_rdd = self.sc.parallelize(X)
-        y_rdd = self.sc.parallelize(y)
-        Z_rdd = X_rdd.zip(y_rdd)
-        Z = DictRDD(Z_rdd, columns=('X', 'y'), block_size=blocks)
+    # def generate_iris(self, blocks=None):
+    #     iris = load_iris()
+
+    #     X = iris.data
+    #     X -= X.mean(axis=0)
+    #     y = iris.target
+
+    #     X_rdd = self.sc.parallelize(X)
+    #     y_rdd = self.sc.parallelize(y)
+    #     Z_rdd = X_rdd.zip(y_rdd)
+    #     Z = DictRDD(Z_rdd, columns=('X', 'y'), block_size=blocks)
+
+    #     return X, y, Z
+
+    def generate_dataset(self, n_classes, n_samples, blocks=None):
+        X, y = make_classification(n_classes=n_classes,
+                                   n_samples=n_samples, n_features=1,
+                                   n_informative=1, n_redundant=0,
+                                   n_clusters_per_class=1,
+                                   random_state=42)
+
+        X_rdd = self.sc.parallelize(X, 4)
+        y_rdd = self.sc.parallelize(y, 4)
+
+        Z = DictRDD(X_rdd.zip(y_rdd), columns=('X', 'y'), block_size=blocks)
+
         return X, y, Z
 
 
@@ -134,6 +158,15 @@ class TestFeatureUnion(PipelineTestCase):
         X_transformed = loc_union.transform(X)
         Z_transformed = sp.vstack(dist_union.transform(Z).collect())
         assert_array_equal(X_transformed.toarray(), Z_transformed.toarray())
+
+    def test_make_union(self):
+        svd = SparkTruncatedSVD()
+        mock = TransfT()
+        fu = make_sparkunion(svd, mock)
+        names, transformers = zip(*fu.transformer_list)
+        assert_equal(names, ("sparktruncatedsvd", "transft"))
+        assert_equal(transformers, (svd, mock))
+
 
 
 # ------------------------- Pipeline tests -------------------
@@ -241,161 +274,27 @@ class TestPipeline(PipelineTestCase):
         params2.pop('filter')
         assert_equal(params, params2)
 
-# def test_pipeline_methods_anova():
-#     # Test the various methods of the pipeline (anova).
-#     iris = load_iris()
-#     X = iris.data
-#     y = iris.target
-#     # Test with Anova + LogisticRegression
-#     clf = LogisticRegression()
-#     filter1 = SelectKBest(f_classif, k=2)
-#     pipe = Pipeline([('anova', filter1), ('logistic', clf)])
-#     pipe.fit(X, y)
-#     pipe.predict(X)
-#     pipe.predict_proba(X)
-#     pipe.predict_log_proba(X)
-#     pipe.score(X, y)
+    def test_pipeline_same_results(self):
+        X, y, Z = self.generate_dataset(2, 100000, 2000)
 
-# def test_pipeline_fit_params():
-#     # Test that the pipeline can take fit parameters
-#     pipe = Pipeline([('transf', TransfT()), ('clf', FitParamT())])
-#     pipe.fit(X=None, y=None, clf__should_succeed=True)
-#     # classifier should return True
-#     assert_true(pipe.predict(None))
-#     # and transformer params should not be changed
-#     assert_true(pipe.named_steps['transf'].a is None)
-#     assert_true(pipe.named_steps['transf'].b is None)
+        loc_clf = LogisticRegression()
+        loc_filter = VarianceThreshold()
+        loc_pipe = Pipeline([
+            ('threshold', loc_filter),
+            ('logistic', loc_clf)
+        ])
 
-# def test_pipeline_methods_pca_svm():
-#     # Test the various methods of the pipeline (pca + svm).
-#     iris = load_iris()
-#     X = iris.data
-#     y = iris.target
-#     # Test with PCA + SVC
-#     clf = SVC(probability=True, random_state=0)
-#     pca = PCA(n_components='mle', whiten=True)
-#     pipe = Pipeline([('pca', pca), ('svc', clf)])
-#     pipe.fit(X, y)
-#     pipe.predict(X)
-#     pipe.predict_proba(X)
-#     pipe.predict_log_proba(X)
-#     pipe.score(X, y)
+        dist_clf = SparkLogisticRegression()
+        dist_filter = SparkVarianceThreshold()
+        dist_pipe = SparkPipeline([
+            ('threshold', dist_filter),
+            ('logistic', dist_clf)
+        ])
 
-# def test_pipeline_methods_preprocessing_svm():
-#     # Test the various methods of the pipeline (preprocessing + svm).
-#     iris = load_iris()
-#     X = iris.data
-#     y = iris.target
-#     n_samples = X.shape[0]
-#     n_classes = len(np.unique(y))
-#     scaler = StandardScaler()
-#     pca = RandomizedPCA(n_components=2, whiten=True)
-#     clf = SVC(probability=True, random_state=0)
+        loc_pipe.fit(X, y)
+        dist_pipe.fit(Z, logistic__classes=np.unique(y))
 
-#     for preprocessing in [scaler, pca]:
-#         pipe = Pipeline([('preprocess', preprocessing), ('svc', clf)])
-#         pipe.fit(X, y)
-
-#         # check shapes of various prediction functions
-#         predict = pipe.predict(X)
-#         assert_equal(predict.shape, (n_samples,))
-
-#         proba = pipe.predict_proba(X)
-#         assert_equal(proba.shape, (n_samples, n_classes))
-
-#         log_proba = pipe.predict_log_proba(X)
-#         assert_equal(log_proba.shape, (n_samples, n_classes))
-
-#         decision_function = pipe.decision_function(X)
-#         assert_equal(decision_function.shape, (n_samples, n_classes))
-
-#         pipe.score(X, y)
-
-# def test_fit_predict_on_pipeline():
-#     # test that the fit_predict method is implemented on a pipeline
-#     # test that the fit_predict on pipeline yields same results as applying
-#     # transform and clustering steps separately
-#     iris = load_iris()
-#     scaler = StandardScaler()
-#     km = KMeans(random_state=0)
-
-#     # first compute the transform and clustering step separately
-#     scaled = scaler.fit_transform(iris.data)
-#     separate_pred = km.fit_predict(scaled)
-
-#     # use a pipeline to do the transform and clustering in one step
-#     pipe = Pipeline([('scaler', scaler), ('Kmeans', km)])
-#     pipeline_pred = pipe.fit_predict(iris.data)
-
-#     assert_array_almost_equal(pipeline_pred, separate_pred)
-
-# def test_fit_predict_on_pipeline_without_fit_predict():
-#     # tests that a pipeline does not have fit_predict method when final
-#     # step of pipeline does not have fit_predict defined
-#     scaler = StandardScaler()
-#     pca = PCA()
-#     pipe = Pipeline([('scaler', scaler), ('pca', pca)])
-#     assert_raises_regex(AttributeError,
-#                         "'PCA' object has no attribute 'fit_predict'",
-#                         getattr, pipe, 'fit_predict')
-
-# def test_pipeline_transform():
-#     # Test whether pipeline works with a transformer at the end.
-#     # Also test pipeline.transform and pipeline.inverse_transform
-#     iris = load_iris()
-#     X = iris.data
-#     pca = PCA(n_components=2)
-#     pipeline = Pipeline([('pca', pca)])
-
-#     # test transform and fit_transform:
-#     X_trans = pipeline.fit(X).transform(X)
-#     X_trans2 = pipeline.fit_transform(X)
-#     X_trans3 = pca.fit_transform(X)
-#     assert_array_almost_equal(X_trans, X_trans2)
-#     assert_array_almost_equal(X_trans, X_trans3)
-
-#     X_back = pipeline.inverse_transform(X_trans)
-#     X_back2 = pca.inverse_transform(X_trans)
-#     assert_array_almost_equal(X_back, X_back2)
-
-# def test_pipeline_fit_transform():
-#     # Test whether pipeline works with a transformer missing fit_transform
-#     iris = load_iris()
-#     X = iris.data
-#     y = iris.target
-#     transft = TransfT()
-#     pipeline = Pipeline([('mock', transft)])
-
-#     # test fit_transform:
-#     X_trans = pipeline.fit_transform(X, y)
-#     X_trans2 = transft.fit(X, y).transform(X)
-#     assert_array_almost_equal(X_trans, X_trans2)
-
-# def test_make_pipeline():
-#     t1 = TransfT()
-#     t2 = TransfT()
-
-#     pipe = make_pipeline(t1, t2)
-#     assert_true(isinstance(pipe, Pipeline))
-#     assert_equal(pipe.steps[0][0], "transft-1")
-#     assert_equal(pipe.steps[1][0], "transft-2")
-
-#     pipe = make_pipeline(t1, t2, FitParamT())
-#     assert_true(isinstance(pipe, Pipeline))
-#     assert_equal(pipe.steps[0][0], "transft-1")
-#     assert_equal(pipe.steps[1][0], "transft-2")
-#     assert_equal(pipe.steps[2][0], "fitparamt")
-
-# def test_classes_property():
-#     iris = load_iris()
-#     X = iris.data
-#     y = iris.target
-
-#     reg = make_pipeline(SelectKBest(k=1), LinearRegression())
-#     reg.fit(X, y)
-#     assert_raises(AttributeError, getattr, reg, "classes_")
-
-#     clf = make_pipeline(SelectKBest(k=1), LogisticRegression(random_state=0))
-#     assert_raises(AttributeError, getattr, clf, "classes_")
-#     clf.fit(X, y)
-#     assert_array_equal(clf.classes_, np.unique(y))
+        assert_true(np.mean(np.abs(
+            loc_pipe.predict(X) - \
+            np.concatenate(dist_pipe.predict(Z[:, 'X']).collect())
+        )) < 0.1)
