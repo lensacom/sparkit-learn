@@ -1,8 +1,15 @@
 # -*- coding: utf-8 -*-
 
+import numpy as np
+import scipy.sparse as sp
+
 from sklearn.externals import six
 from sklearn.pipeline import Pipeline
+from sklearn.pipeline import FeatureUnion
+from sklearn.externals.joblib import Parallel, delayed
+from sklearn.pipeline import _name_estimators
 
+from splearn.rdd import ArrayRDD, DictRDD
 
 class SparkPipeline(Pipeline):
 
@@ -122,3 +129,175 @@ class SparkPipeline(Pipeline):
         for name, transform in self.steps[:-1]:
             Zt = transform.transform(Zt)
         return self.steps[-1][-1].score(Zt)
+
+    def get_params(self, deep=True):
+        if not deep:
+            return super(SparkPipeline, self).get_params(deep=False)
+        else:
+            out = self.named_steps.copy()
+            for name, step in six.iteritems(self.named_steps):
+                for key, value in six.iteritems(step.get_params(deep=True)):
+                    out['%s__%s' % (name, key)] = value
+
+            out.update(super(SparkPipeline, self).get_params(deep=False))
+            return out
+
+################################################################################
+
+
+def _fit_one_transformer(transformer, Z, **fit_params):
+    return transformer.fit(Z, **fit_params)
+
+
+def _transform_one(transformer, name, Z, transformer_weights):
+    if transformer_weights is not None and name in transformer_weights:
+        # if we have a weight for this transformer, muliply output
+        if isinstance(Z, DictRDD):
+            return transformer.transform(Z).transform(
+                lambda x: x * transformer_weights[name], 'X')
+        else:
+            return transformer.transform(Z).map(
+                lambda x: x * transformer_weights[name])
+    return transformer.transform(Z)
+
+
+def _fit_transform_one(transformer, name, Z, transformer_weights,
+                       **fit_params):
+    if transformer_weights is not None and name in transformer_weights:
+        # if we have a weight for this transformer, muliply output
+        if hasattr(transformer, 'fit_transform'):
+            Z_transformed = transformer.fit_transform(Z, **fit_params)
+        else:
+            Z_transformed = transformer.fit(Z, **fit_params).transform(Z)
+        # multiplication by weight
+        if isinstance(Z, DictRDD):
+            Z_transformed.transform(
+                lambda x: x * transformer_weights[name], 'X')
+        else:
+            Z_transformed.map(lambda x: x * transformer_weights[name])
+
+        return Z_transformed, transformer
+    if hasattr(transformer, 'fit_transform'):
+        Z_transformed = transformer.fit_transform(Z, **fit_params)
+        return Z_transformed, transformer
+    else:
+        Z_transformed = transformer.fit(Z, **fit_params).transform(Z)
+        return Z_transformed, transformer
+
+
+class SparkFeatureUnion(FeatureUnion):
+    """TODO: rewrite docstring
+    Concatenates results of multiple transformer objects.
+    This estimator applies a list of transformer objects in parallel to the
+    input data, then concatenates the results. This is useful to combine
+    several feature extraction mechanisms into a single transformer.
+    Parameters
+    ----------
+    transformer_list: list of (string, transformer) tuples
+        List of transformer objects to be applied to the data. The first
+        half of each tuple is the name of the transformer.
+    n_jobs: int, optional
+        Number of jobs to run in parallel (default 1).
+    transformer_weights: dict, optional
+        Multiplicative weights for features per transformer.
+        Keys are transformer names, values the weights.
+    """
+
+    def fit(self, Z):
+        """TODO: rewrite docstring
+        Fit all transformers using X.
+        Parameters
+        ----------
+        X : array-like or sparse matrix, shape (n_samples, n_features)
+            Input data, used to fit transformers.
+        """
+        transformers = Parallel(n_jobs=self.n_jobs, backend="threading")(
+            delayed(_fit_one_transformer)(trans, Z)
+            for name, trans in self.transformer_list)
+        self._update_transformer_list(transformers)
+        return self
+
+    def fit_transform(self, Z, **fit_params):
+        """TODO: rewrite docstring
+        Fit all transformers using X, transform the data and concatenate
+        results.
+        Parameters
+        ----------
+        X : array-like or sparse matrix, shape (n_samples, n_features)
+            Input data to be transformed.
+        Returns
+        -------
+        X_t : array-like or sparse matrix, shape (n_samples, sum_n_components)
+            hstack of results of transformers. sum_n_components is the
+            sum of n_components (output dimension) over transformers.
+        """
+        result = Parallel(n_jobs=self.n_jobs, backend="threading")(
+            delayed(_fit_transform_one)(trans, name, Z,
+                                        self.transformer_weights, **fit_params)
+            for name, trans in self.transformer_list)
+
+        Zs, transformers = zip(*result)
+        self._update_transformer_list(transformers)
+
+        X = reduce(lambda x, y: x.zip(y._rdd), Zs)
+        for item in X.first():
+            if sp.issparse(item):
+                issparse = True
+                return X.map(lambda x: sp.hstack(x))
+        X = X.map(lambda x: np.hstack(x))
+
+    def transform(self, Z):
+        """TODO: rewrite docstring
+        Transform X separately by each transformer, concatenate results.
+        Parameters
+        ----------
+        X : array-like or sparse matrix, shape (n_samples, n_features)
+            Input data to be transformed.
+        Returns
+        -------
+        X_t : array-like or sparse matrix, shape (n_samples, sum_n_components)
+            hstack of results of transformers. sum_n_components is the
+            sum of n_components (output dimension) over transformers.
+        """
+        Zs = [_transform_one(trans, name, Z, self.transformer_weights)
+              for name, trans in self.transformer_list]
+        X = reduce(lambda x, y: x.zip(y._rdd), Zs)
+        for item in X.first():
+            if sp.issparse(item):
+                return X.map(lambda x: sp.hstack(x))
+        return X.map(lambda x: np.hstack(x))
+
+    def get_params(self, deep=True):
+        if not deep:
+            return super(SparkFeatureUnion, self).get_params(deep=False)
+        else:
+            out = dict(self.transformer_list)
+            for name, trans in self.transformer_list:
+                for key, value in six.iteritems(trans.get_params(deep=True)):
+                    out['%s__%s' % (name, key)] = value
+            out.update(super(SparkFeatureUnion, self).get_params(deep=False))
+            return out
+
+
+def make_sparkunion(*transformers):
+    """Construct a FeatureUnion from the given transformers.
+    This is a shorthand for the FeatureUnion constructor; it does not require,
+    and does not permit, naming the transformers. Instead, they will be given
+    names automatically based on their types. It also does not allow weighting.
+    Examples
+    --------
+    >>> from sklearn.decomposition import PCA, TruncatedSVD
+    >>> make_union(PCA(), TruncatedSVD())    # doctest: +NORMALIZE_WHITESPACE
+    FeatureUnion(n_jobs=1,
+                 transformer_list=[('pca', PCA(copy=True, n_components=None,
+                                               whiten=False)),
+                                   ('truncatedsvd',
+                                    TruncatedSVD(algorithm='randomized',
+                                                 n_components=2, n_iter=5,
+                                                 random_state=None, tol=0.0))],
+                 transformer_weights=None)
+    Returns
+    -------
+    f : FeatureUnion
+    """
+    return SparkFeatureUnion(_name_estimators(transformers))
