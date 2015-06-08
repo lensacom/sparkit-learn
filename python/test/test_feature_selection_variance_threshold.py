@@ -7,7 +7,7 @@ from common import SplearnTestCase
 from numpy.testing import assert_array_almost_equal
 from sklearn.feature_selection import VarianceThreshold
 from splearn.feature_selection import SparkVarianceThreshold
-from splearn.rdd import ArrayRDD
+from splearn.rdd import ArrayRDD, DictRDD
 
 
 class FeatureSelectionTestCase(SplearnTestCase):
@@ -28,9 +28,12 @@ class FeatureSelectionTestCase(SplearnTestCase):
 
     def generate_sparse_dataset(self, shape=(1e3, 100), block_size=None):
         data = sp.rand(shape[0], shape[1], random_state=2, density=0.1).toarray()
-        X = [sp.csr_matrix([row]) for row in data]
-        X_rdd = ArrayRDD(self.sc.parallelize(X, 4), block_size)
-        return sp.vstack(X), X_rdd
+        X, y = [sp.csr_matrix([row]) for row in data], np.ones((len(data),))
+        X_rdd = self.sc.parallelize(X, 4)
+        y_rdd = self.sc.parallelize(y, 4)
+        Z_array = ArrayRDD(X_rdd, bsize=block_size)
+        Z_dict = DictRDD(X_rdd.zip(y_rdd), bsize=block_size, columns=('X', 'y'))
+        return sp.vstack(X), Z_array, Z_dict
 
 
 class TestVarianceThreshold(FeatureSelectionTestCase):
@@ -51,9 +54,11 @@ class TestVarianceThreshold(FeatureSelectionTestCase):
             dist.fit(X_rdd)
             assert_array_almost_equal(local.variances_, dist.variances_)
 
-            X, X_rdd = self.generate_sparse_dataset()
+            X, X_rdd, Z_rdd = self.generate_sparse_dataset()
             local.fit(X)
             dist.fit(X_rdd)
+            assert_array_almost_equal(local.variances_, dist.variances_)
+            dist.fit(Z_rdd)
             assert_array_almost_equal(local.variances_, dist.variances_)
 
     def test_same_transform_result(self):
@@ -65,9 +70,12 @@ class TestVarianceThreshold(FeatureSelectionTestCase):
         result_dist = np.vstack(dist.fit_transform(X_rdd).collect())
         assert_array_almost_equal(result_local, result_dist)
 
-        X, X_rdd = self.generate_sparse_dataset()
+        X, X_rdd, Z_rdd = self.generate_sparse_dataset()
         result_local = local.fit_transform(X)
         result_dist = sp.vstack(dist.fit_transform(X_rdd).collect())
+        assert_array_almost_equal(result_local.toarray(),
+                                  result_dist.toarray())
+        result_dist = sp.vstack(dist.fit_transform(Z_rdd)[:, 'X'].collect())
         assert_array_almost_equal(result_local.toarray(),
                                   result_dist.toarray())
 
@@ -80,8 +88,11 @@ class TestVarianceThreshold(FeatureSelectionTestCase):
         result_dist = np.vstack(dist.fit_transform(X_rdd).collect())
         assert_array_almost_equal(result_local, result_dist)
 
-        X, X_rdd = self.generate_sparse_dataset()
+        X, X_rdd, Z_rdd = self.generate_sparse_dataset()
         result_local = local.fit_transform(X)
         result_dist = sp.vstack(dist.fit_transform(X_rdd).collect())
+        assert_array_almost_equal(result_local.toarray(),
+                                  result_dist.toarray())
+        result_dist = sp.vstack(dist.fit_transform(Z_rdd)[:, 'X'].collect())
         assert_array_almost_equal(result_local.toarray(),
                                   result_dist.toarray())

@@ -52,7 +52,7 @@ class PipelineTestCase(SplearnTestCase):
             "the coke burger burger",
         )
         Z_rdd = self.sc.parallelize(X)
-        Z = ArrayRDD(Z_rdd, block_size=blocks)
+        Z = ArrayRDD(Z_rdd, bsize=blocks)
         return X, Z
 
     # def generate_iris(self, blocks=None):
@@ -65,21 +65,21 @@ class PipelineTestCase(SplearnTestCase):
     #     X_rdd = self.sc.parallelize(X)
     #     y_rdd = self.sc.parallelize(y)
     #     Z_rdd = X_rdd.zip(y_rdd)
-    #     Z = DictRDD(Z_rdd, columns=('X', 'y'), block_size=blocks)
+    #     Z = DictRDD(Z_rdd, columns=('X', 'y'), bsize=blocks)
 
     #     return X, y, Z
 
     def generate_dataset(self, n_classes, n_samples, blocks=None):
         X, y = make_classification(n_classes=n_classes,
-                                   n_samples=n_samples, n_features=1,
-                                   n_informative=1, n_redundant=0,
+                                   n_samples=n_samples, n_features=10,
+                                   n_informative=4, n_redundant=0,
                                    n_clusters_per_class=1,
                                    random_state=42)
 
         X_rdd = self.sc.parallelize(X, 4)
         y_rdd = self.sc.parallelize(y, 4)
 
-        Z = DictRDD(X_rdd.zip(y_rdd), columns=('X', 'y'), block_size=blocks)
+        Z = DictRDD(X_rdd.zip(y_rdd), columns=('X', 'y'), bsize=blocks)
 
         return X, y, Z
 
@@ -275,7 +275,7 @@ class TestPipeline(PipelineTestCase):
         assert_equal(params, params2)
 
     def test_pipeline_same_results(self):
-        X, y, Z = self.generate_dataset(2, 100000, 2000)
+        X, y, Z = self.generate_dataset(2, 10000, 2000)
 
         loc_clf = LogisticRegression()
         loc_filter = VarianceThreshold()
@@ -291,6 +291,7 @@ class TestPipeline(PipelineTestCase):
             ('logistic', dist_clf)
         ])
 
+        dist_filter.fit(Z)
         loc_pipe.fit(X, y)
         dist_pipe.fit(Z, logistic__classes=np.unique(y))
 

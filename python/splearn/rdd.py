@@ -302,6 +302,7 @@ class ArrayRDD(BlockRDD):
     """
 
     def __init__(self, rdd, bsize=-1, dtype=None, noblock=False):
+        # TODO: accept list of RDDs then zip them
         super(ArrayRDD, self).__init__(rdd, bsize, None, noblock)
 
     def __getitem__(self, key):
@@ -537,7 +538,7 @@ class DictRDD(BlockRDD):
             return super(DictRDD, self).__getitem__(key)
 
     def __contains__(self, key):
-        return key in self._cols
+        return key in self.columns
 
     def unblock(self):
         """Flattens the blocks.
@@ -550,7 +551,7 @@ class DictRDD(BlockRDD):
         """
         return (super(DictRDD, self).get(0).shape[0], self.columns)
 
-    def transform(self, f, column=None):
+    def transform(self, fn, column=None):
         """Execute a transformation on a column or columns. Returns the modified
         DictRDD.
 
@@ -566,13 +567,30 @@ class DictRDD(BlockRDD):
         -------
         result : DictRDD
             DictRDD with transformed column(s).
+
+        TODO: optimize
         """
-
-        if column is not None:
-            column = self._cols.index(column)
-            mapper = lambda x: x[:column] + (f(x[column]),) + x[column + 1:]
+        if column is None:
+            indices = range(len(self.columns))
         else:
-            mapper = f
+            if not hasattr(column, '__iter__'):
+                column = [column]
+            indices = [self.columns.index(c) for c in column]
 
-        return self.__class__(self._rdd.map(f), noblock=True,
+        def mapper(values):
+            result = fn(*[values[i] for i in indices])
+
+            if len(indices) == 1:
+                result = (result,)
+            elif not isinstance(result, (tuple, list)):
+                raise ValueError("Transformer function must return an"
+                                 " iterable!")
+            elif len(result) != len(indices):
+                raise ValueError("Transformer result's length must be"
+                                 " equal to the given columns length!")
+
+            return tuple(result[indices.index(i)] if i in indices else v
+                         for i, v in enumerate(values))
+
+        return self.__class__(self._rdd.map(mapper), noblock=True,
                               **self.get_params())

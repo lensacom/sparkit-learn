@@ -566,7 +566,6 @@ class TestDictRDD(SplearnTestCase):
         y_rdd = self.sc.parallelize(y, 2)
         z_rdd = x_rdd.zip(y_rdd)
         z = DictRDD(z_rdd, bsize=5)
-        print z.collect()
 
         expected = [(np.arange(0, 10).reshape((5, 2)), np.arange(0, 5)),
                     (np.arange(10, 20).reshape((5, 2)), np.arange(5, 10))]
@@ -582,3 +581,31 @@ class TestDictRDD(SplearnTestCase):
                                       (expected[1][1],)])
         assert_equal_multiple_tuples(z[[1, 0], [1, 0]].collect(),
                                      [expected[1][::-1], expected[0][::-1]])
+
+    def test_transform(self):
+        data1 = np.arange(400).reshape((100, 4))
+        data2 = np.arange(200).reshape((100, 2))
+        rdd1 = self.sc.parallelize(data1, 4)
+        rdd2 = self.sc.parallelize(data2, 4)
+
+        X = DictRDD(rdd1.zip(rdd2), bsize=5)
+
+        X1 = [(x[0], x[1]**2) for x in X.collect()]
+        X2 = X.transform(lambda a, b: (a, b**2)).collect()
+        assert_equal_multiple_tuples(X1, X2)
+
+        X1 = [(x[0], x[1]**2) for x in X.collect()]
+        X2 = X.transform(lambda x: x**2, column=1).collect()
+        assert_equal_multiple_tuples(X1, X2)
+
+        X1 = [(x[0]**2, x[1]) for x in X.collect()]
+        X2 = X.transform(lambda x: x**2, column=0).collect()
+        assert_equal_multiple_tuples(X1, X2)
+
+        X1 = [(x[0]**2, x[1]**0.5) for x in X.collect()]
+        X2 = X.transform(lambda a, b: (a**2, b**0.5), column=[0, 1]).collect()
+        assert_equal_multiple_tuples(X1, X2)
+
+        X1 = [(x[0]**2, x[1]**0.5) for x in X.collect()]
+        X2 = X.transform(lambda b, a: (b**0.5, a**2), column=[1, 0]).collect()
+        assert_equal_multiple_tuples(X1, X2)

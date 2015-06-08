@@ -242,7 +242,6 @@ class SparkFeatureUnion(FeatureUnion):
         X = reduce(lambda x, y: x.zip(y._rdd), Zs)
         for item in X.first():
             if sp.issparse(item):
-                issparse = True
                 return X.map(lambda x: sp.hstack(x))
         X = X.map(lambda x: np.hstack(x))
 
