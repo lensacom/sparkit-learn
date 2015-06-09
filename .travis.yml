@@ -18,9 +18,7 @@ install:
 - conda create --yes -q -n test-environment python=$TRAVIS_PYTHON_VERSION nose numpy
   scipy scikit-learn scikit-image matplotlib
 - source activate test-environment
-- cd python
 - pip install -r requirements.txt
-- cd ..
 - wget http://d3kbcqa49mib13.cloudfront.net/spark-1.3.1-bin-hadoop2.4.tgz
 - tar -xzf spark-1.3.1-bin-hadoop2.4.tgz
 - sudo rm -rf /dev/shm && sudo ln -s /run/shm /dev/shm
