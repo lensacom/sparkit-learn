@@ -1,0 +1,7 @@
+argparse
+nose
+numpy
+rednose
+scikit-learn>=0.16.1
+scipy
+six
