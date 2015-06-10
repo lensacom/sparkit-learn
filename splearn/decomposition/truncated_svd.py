@@ -2,7 +2,6 @@ from operator import add
 
 import numpy as np
 import scipy.linalg as ln
-from pyspark import Broadcast
 # from pyspark import AccumulatorParam
 from sklearn.decomposition import TruncatedSVD
 from sklearn.utils.extmath import safe_sparse_dot
@@ -255,16 +254,7 @@ class SparkTruncatedSVD(TruncatedSVD, SparkBroadcasterMixin):
 
     """
 
-    @property
-    def components_(self):
-        if isinstance(self._bc_components, Broadcast):
-            return self._bc_components.value
-        else:
-            return self._bc_components
-
-    @components_.setter
-    def components_(self, value):
-        self._bc_components = value
+    __transient__ = ['components_']
 
     def __init__(self, n_components=2, algorithm="em", n_iter=30,
                  random_state=None, tol=1e-7):
@@ -328,8 +318,8 @@ class SparkTruncatedSVD(TruncatedSVD, SparkBroadcasterMixin):
         X_new : array, shape (n_samples, n_components)
             Reduced version of X. This will always be a dense array.
         """
-        self._broadcast(Z.context, '_bc_components')
         mapper = super(SparkTruncatedSVD, self).transform
+        mapper = self.broadcast(mapper, Z.context)
         return Z.transform(mapper, column='X')
 
     def inverse_transform(self, Z):
@@ -348,4 +338,5 @@ class SparkTruncatedSVD(TruncatedSVD, SparkBroadcasterMixin):
             Note that this is always a dense array.
         """
         mapper = super(SparkTruncatedSVD, self).inverse_transform
+        mapper = self.broadcast(mapper, Z.context)
         return Z.transform(mapper, column='X')

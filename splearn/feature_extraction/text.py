@@ -7,18 +7,17 @@ from itertools import chain
 import numpy as np
 import scipy.sparse as sp
 import six
-from pyspark import AccumulatorParam, Broadcast
+from pyspark import AccumulatorParam
 from sklearn.feature_extraction.text import (CountVectorizer,
                                              HashingVectorizer,
                                              TfidfTransformer,
                                              _document_frequency,
                                              _make_int_array)
-from sklearn.preprocessing import normalize
 from sklearn.utils.fixes import frombuffer_empty
 from sklearn.utils.validation import check_is_fitted
 
 from ..base import SparkBroadcasterMixin
-from ..rdd import ArrayRDD, DictRDD
+from ..rdd import DictRDD
 
 
 class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
@@ -134,16 +133,7 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
     HashingVectorizer, TfidfVectorizer
     """
 
-    @property
-    def vocabulary_(self):
-        if isinstance(self._bc_vocabulary, Broadcast):
-            return self._bc_vocabulary.value
-        else:
-            return self._bc_vocabulary
-
-    @vocabulary_.setter
-    def vocabulary_(self, value):
-        self._bc_vocabulary = value
+    __transient__ = ['vocabulary_']
 
     def _init_vocab(self, analyzed_docs):
         """Create vocabulary
@@ -297,13 +287,13 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
         analyze = self.build_analyzer()
         A = Z.transform(lambda X: map(analyze, X), column='X').persist()
 
-        # create and broadcast vocabulary
+        # create vocabulary
         X = A[:, 'X'] if isinstance(A, DictRDD) else A
-        vocabulary = self._init_vocab(X)
-        self._broadcast(A.context, '_bc_vocabulary', vocabulary)
+        self.vocabulary_ = self._init_vocab(X)
 
         # transform according to vocabulary
-        Z = A.transform(lambda X: self._count_vocab(X), column='X')
+        mapper = self.broadcast(self._count_vocab, A.context)
+        Z = A.transform(mapper, column='X')
         Z = Z.persist()
         A.unpersist()
 
@@ -326,16 +316,13 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
                 raise ValueError(
                     "max_df corresponds to < documents than min_df")
             kept_indices, self.stop_words_ = self._limit_features(
-                X, vocabulary, max_doc_count, min_doc_count, max_features)
+                X, self.vocabulary_, max_doc_count, min_doc_count, max_features)
 
             # sort features
-            map_index = self._sort_features(vocabulary)
+            map_index = self._sort_features(self.vocabulary_)
 
             # combined mask
             mask = kept_indices[map_index]
-
-            # set state
-            self.vocabulary_ = vocabulary
 
             Z = Z.transform(lambda x: x[:, mask], column='X')
 
@@ -361,11 +348,12 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
             self._validate_vocabulary()
 
         self._check_vocabulary()
-        self._broadcast(Z.context, '_bc_vocabulary')
 
         analyze = self.build_analyzer()
+        mapper = self.broadcast(self._count_vocab, Z.context)
+
         Z = Z.transform(lambda X: map(analyze, X), column='X') \
-             .transform(lambda X: self._count_vocab(X), column='X')
+             .transform(mapper, column='X')
 
         return Z
 
@@ -547,16 +535,7 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
                    Press, pp. 118-120.`
     """
 
-    @property
-    def _idf_diag(self):  # use broadcasted variable
-        if isinstance(self._bc_idf_diag, Broadcast):
-            return self._bc_idf_diag.value
-        else:
-            return self._bc_idf_diag
-
-    @_idf_diag.setter
-    def _idf_diag(self, value):
-        self._bc_idf_diag = value
+    __transient__ = ['_idf_diag']
 
     def fit(self, Z):
         """Learn the idf vector (global term weights)
@@ -609,9 +588,10 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
         Z : ArrayRDD/DictRDD containing sparse matrices
         """
 
-        if self.use_idf:
-            check_is_fitted(self, '_bc_idf_diag', 'idf vector is not fitted')
-            self._broadcast(Z.context, '_bc_idf_diag')
-
         mapper = super(SparkTfidfTransformer, self).transform
+
+        if self.use_idf:
+            check_is_fitted(self, '_idf_diag', 'idf vector is not fitted')
+            mapper = self.broadcast(mapper, Z.context)
+
         return Z.transform(mapper, column='X')

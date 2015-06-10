@@ -39,6 +39,8 @@ class SparkVarianceThreshold(VarianceThreshold, SparkSelectorMixin):
                [1, 1]])
     """
 
+    __transient__ = ['variances_']
+
     def fit(self, Z):
         """Learn empirical variances from X.
 
@@ -85,3 +87,20 @@ class SparkVarianceThreshold(VarianceThreshold, SparkSelectorMixin):
             raise ValueError(msg.format(self.threshold))
 
         return self
+
+    def transform(self, Z):
+        """Reduce X to the selected features.
+
+        Parameters
+        ----------
+        X : array of shape [n_samples, n_features]
+            The input samples.
+
+        Returns
+        -------
+        X_r : array of shape [n_samples, n_selected_features]
+            The input samples with only the selected features.
+        """
+        mapper = super(SparkVarianceThreshold, self).transform
+        mapper = self.broadcast(mapper, Z.context)
+        return Z.transform(mapper, column='X')

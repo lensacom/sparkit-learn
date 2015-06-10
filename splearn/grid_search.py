@@ -9,10 +9,11 @@ from sklearn.base import clone
 from sklearn.externals.joblib import Parallel, delayed
 from sklearn.grid_search import GridSearchCV, ParameterGrid, _CVScoreTuple
 from sklearn.metrics.scorer import check_scoring
+from splearn.base import SparkBaseEstimator
 from splearn.cross_validation import _check_cv, _fit_and_score
 
 
-class SparkGridSearchCV(GridSearchCV):
+class SparkGridSearchCV(GridSearchCV, SparkBaseEstimator):
 
     def _fit(self, Z, parameter_iterable):
         """Actual fitting,  performing the search over parameters."""
