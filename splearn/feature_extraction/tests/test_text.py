@@ -25,10 +25,10 @@ class TestCountVectorizer(SplearnTestCase):
     def test_limit_features(self):
         X, X_rdd = self.make_text_rdd()
 
-        params = [  # {'min_df': .5},
-            # {'min_df': 2, 'max_df': .9},
-            # {'min_df': 1, 'max_df': .6},
-            {'min_df': 2, 'max_features': 3}]
+        params = [{'min_df': .5},
+                  {'min_df': 2, 'max_df': .9},
+                  {'min_df': 1, 'max_df': .6},
+                  {'min_df': 2, 'max_features': 3}]
 
         for paramset in params:
             local = CountVectorizer(**paramset)
