@@ -4,7 +4,11 @@ import itertools
 
 import numpy as np
 import scipy.sparse as sp
-from pyspark.rdd import RDD
+try:
+    from pyspark.rdd import RDD
+except ImportError:
+    raise ImportError("pyspark home needs to be added to PYTHONPATH.\n"
+                      "export PYTHONPATH=$PYTHONPATH:$SPARK_HOME/python:../")
 
 
 def _pack_accumulated(accumulated, dtype=None):
