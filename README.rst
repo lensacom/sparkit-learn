@@ -5,6 +5,8 @@ Sparkit-learn
 
 **PySpark + Scikit-learn = Sparkit-learn**
 
+GitHub: https://github.com/lensacom/sparkit-learn
+
 About
 =====
 
