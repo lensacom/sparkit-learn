@@ -328,12 +328,22 @@ class ArrayRDD(BlockRDD):
             return super(ArrayRDD, self).__getitem__(key)
 
     @property
+    def ndim(self):
+        return self._rdd.first().ndim
+
+    @property
     def shape(self):
         """Returns the shape of the data."""
         # TODO cache
         first = self.first().shape
         shape = self._rdd.map(lambda x: x.shape[0]).sum()
         return (shape,) + first[1:]
+
+    @property
+    def size(self):
+        """Returns the shape of the data.
+        """
+        return np.prod(self.shape)
 
     def toarray(self):
         """Returns the data as numpy.array from each partition."""
@@ -563,12 +573,6 @@ class DictRDD(BlockRDD):
         """Flattens the blocks.
         """
         return self._rdd.flatMap(lambda cols: zip(*cols))
-
-    @property
-    def shape(self):
-        """Returns the shape of the data.
-        """
-        return (super(DictRDD, self).get(0).shape[0], self.columns)
 
     def transform(self, fn, column=None):
         """Execute a transformation on a column or columns. Returns the modified
