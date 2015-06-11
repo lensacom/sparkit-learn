@@ -20,5 +20,6 @@ setup(
               'splearn.linear_model',
               'splearn.svm'],
     long_description=open('./README.rst').read(),
+    setup_requires=['numpy'],
     install_requires=open('./requirements.txt').read().split()
 )
