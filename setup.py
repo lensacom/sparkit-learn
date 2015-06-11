@@ -10,6 +10,7 @@ setup(
     description='Scikit-learn on PySpark',
     author='Krisztian Szucs, Andras Fulop',
     author_email='krisztian.szucs@lensa.com, andras.fulop@lensa.com',
+    license='Apache License, Version 2.0',
     url='https://github.com/lensacom/sparkit-learn',
     packages=['splearn',
               'splearn.cluster',
@@ -18,6 +19,6 @@ setup(
               'splearn.feature_selection',
               'splearn.linear_model',
               'splearn.svm'],
-    long_description=open('../README.md').read(),
-    install_requires=open('requirements.txt').read().split()
+    long_description=open('./README.rst').read(),
+    install_requires=open('./requirements.txt').read().split()
 )
