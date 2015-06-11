@@ -287,6 +287,17 @@ class TestArrayRDD(SplearnTestCase):
         shapes = ArrayRDD(rdd, 66).map(lambda x: x.shape[0]).collect()
         assert_true(all(np.in1d(shapes, [66, 34])))
 
+    def test_ndim(self):
+        data = np.arange(4000)
+        shapes = [(4000),
+                  (1000, 4),
+                  (200, 10, 2),
+                  (100, 10, 2, 2)]
+        for shape in shapes:
+            reshaped = data.reshape(shape)
+            rdd = self.sc.parallelize(reshaped)
+            assert_equal(ArrayRDD(rdd).ndim, reshaped.ndim)
+
     def test_shape(self):
         data = np.arange(4000)
         shapes = [(1000, 4),
@@ -294,8 +305,22 @@ class TestArrayRDD(SplearnTestCase):
                   (100, 40),
                   (2000, 2)]
         for shape in shapes:
-            rdd = self.sc.parallelize(data.reshape(shape))
+            reshaped = data.reshape(shape)
+            rdd = self.sc.parallelize(reshaped)
             assert_equal(ArrayRDD(rdd).shape, shape)
+
+    def test_size(self):
+        data = np.arange(4000)
+        shapes = [(1000, 4),
+                  (200, 20),
+                  (100, 40),
+                  (2000, 2)]
+        for shape in shapes:
+            reshaped = data.reshape(shape)
+            rdd = self.sc.parallelize(reshaped)
+            size = ArrayRDD(rdd).map(lambda x: x.size).sum()
+            assert_equal(size, reshaped.size)
+            assert_equal(ArrayRDD(rdd).size, reshaped.size)
 
     def test_unblocking_rdd(self):
         data = np.arange(400)
