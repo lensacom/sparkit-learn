@@ -10,7 +10,7 @@ from sklearn.utils.testing import (assert_almost_equal,
                                    assert_array_almost_equal,
                                    assert_array_equal, assert_equal,
                                    assert_raises, assert_true)
-from splearn.rdd import ArrayRDD, DictRDD
+from splearn.rdd import ArrayRDD, SparseRDD, DictRDD
 
 
 def assert_tuple_equal(tpl1, tpl2):
@@ -83,8 +83,13 @@ class SplearnTestCase(unittest.TestCase):
         X_rdd = ArrayRDD(self.sc.parallelize(X, 4), block_size)
         return X, X_rdd
 
+    def make_dense_range_rdd(self, shape=(1e3, 10), block_size=None):
+        X = np.arange(np.prod(shape)).reshape(shape)
+        X_rdd = ArrayRDD(self.sc.parallelize(X, 4), block_size)
+        return X, X_rdd
+
     def make_sparse_rdd(self, shape=(1e3, 10), block_size=None):
         X = sp.rand(shape[0], shape[1], random_state=2, density=0.1)
         X_rows = [sp.csr_matrix([row]) for row in X.toarray()]
-        X_rdd = ArrayRDD(self.sc.parallelize(X_rows, 4), block_size)
+        X_rdd = SparseRDD(self.sc.parallelize(X_rows, 4), block_size)
         return X, X_rdd

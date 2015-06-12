@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.sparse as sp
 from pyspark import RDD
-from splearn.rdd import ArrayRDD, BlockRDD, DictRDD, block
+from splearn.rdd import ArrayRDD, BlockRDD, DictRDD
 from splearn.utils.testing import (SplearnTestCase, assert_almost_equal,
                                    assert_array_almost_equal,
                                    assert_array_equal, assert_equal,
@@ -10,128 +10,120 @@ from splearn.utils.testing import (SplearnTestCase, assert_almost_equal,
                                    assert_true, assert_tuple_equal)
 
 
-def unpack(rdd):
-    blocks = rdd.collect()
-    if sp.issparse(blocks[0]):
-        return sp.vstack(blocks)
-    else:
-        return np.concatenate(blocks)
+# class TestBlocking(SplearnTestCase):
 
+#     def test_empty(self):
+#         n_partitions = 3
+#         empty_data = self.sc.parallelize([], n_partitions)
+#         assert_raises(ValueError, block, empty_data)
 
-class TestBlocking(SplearnTestCase):
+#     def test_dtype(self):
+#         n_partitions = 10
+#         n_samples = 100
+#         data = self.sc.parallelize(["lorem" for i in range(n_samples)],
+#                                    n_partitions)
+#         blocked_data = block(data, dtype=list)
+#         assert_array_equal(["lorem"] * 10, blocked_data.first())
+#         blocks = blocked_data.collect()
+#         assert_equal(len(blocks), n_partitions)
+#         assert_array_equal(["lorem"] * 10, blocks[-1])
+#         assert_equal(sum(len(b) for b in blocks), n_samples)
 
-    def test_empty(self):
-        n_partitions = 3
-        empty_data = self.sc.parallelize([], n_partitions)
-        assert_raises(ValueError, block, empty_data)
+#         n_partitions = 17
+#         data = self.sc.parallelize([1 for i in range(n_samples)],
+#                                    n_partitions)
+#         blocked_data = block(data, dtype=tuple)
+#         assert_array_equal(tuple([1] * (n_samples / n_partitions)),
+#                            blocked_data.first())
+#         blocks = blocked_data.collect()
+#         assert_equal(len(blocks), n_partitions)
+#         assert_equal(sum(len(b) for b in blocks), n_samples)
 
-    def test_dtype(self):
-        n_partitions = 10
-        n_samples = 100
-        data = self.sc.parallelize(["lorem" for i in range(n_samples)],
-                                   n_partitions)
-        blocked_data = block(data, dtype=list)
-        assert_array_equal(["lorem"] * 10, blocked_data.first())
-        blocks = blocked_data.collect()
-        assert_equal(len(blocks), n_partitions)
-        assert_array_equal(["lorem"] * 10, blocks[-1])
-        assert_equal(sum(len(b) for b in blocks), n_samples)
+#     def test_array(self):
+#         n_partitions = 10
+#         n_samples = 100
+#         data = self.sc.parallelize([np.array([1]) for i in range(n_samples)],
+#                                    n_partitions)
+#         blocked_data = block(data)
+#         assert_array_equal(np.ones((10, 1)), blocked_data.first())
+#         blocks = blocked_data.collect()
+#         assert_equal(len(blocks), n_partitions)
+#         assert_array_equal(np.ones((10, 1)), blocks[-1])
+#         assert_equal(sum(len(b) for b in blocks), n_samples)
 
-        n_partitions = 17
-        data = self.sc.parallelize([1 for i in range(n_samples)],
-                                   n_partitions)
-        blocked_data = block(data, dtype=tuple)
-        assert_array_equal(tuple([1] * (n_samples / n_partitions)),
-                           blocked_data.first())
-        blocks = blocked_data.collect()
-        assert_equal(len(blocks), n_partitions)
-        assert_equal(sum(len(b) for b in blocks), n_samples)
+#         n_partitions = 17
+#         data = self.sc.parallelize([np.array([1]) for i in range(n_samples)],
+#                                    n_partitions)
+#         blocked_data = block(data)
+#         assert_array_equal(np.ones((n_samples / n_partitions, 1)),
+#                            blocked_data.first())
+#         blocks = blocked_data.collect()
+#         assert_equal(len(blocks), n_partitions)
+#         assert_equal(sum(len(b) for b in blocks), n_samples)
 
-    def test_array(self):
-        n_partitions = 10
-        n_samples = 100
-        data = self.sc.parallelize([np.array([1]) for i in range(n_samples)],
-                                   n_partitions)
-        blocked_data = block(data)
-        assert_array_equal(np.ones((10, 1)), blocked_data.first())
-        blocks = blocked_data.collect()
-        assert_equal(len(blocks), n_partitions)
-        assert_array_equal(np.ones((10, 1)), blocks[-1])
-        assert_equal(sum(len(b) for b in blocks), n_samples)
+#     def test_array_bsize(self):
+#         n_partitions = 10
+#         n_samples = 107
+#         data = self.sc.parallelize([np.array([1]) for i in range(n_samples)],
+#                                    n_partitions)
 
-        n_partitions = 17
-        data = self.sc.parallelize([np.array([1]) for i in range(n_samples)],
-                                   n_partitions)
-        blocked_data = block(data)
-        assert_array_equal(np.ones((n_samples / n_partitions, 1)),
-                           blocked_data.first())
-        blocks = blocked_data.collect()
-        assert_equal(len(blocks), n_partitions)
-        assert_equal(sum(len(b) for b in blocks), n_samples)
+#         block_data_5 = block(data, bsize=5)
+#         blocks = block_data_5.collect()
+#         assert_true(all(len(b) <= 5 for b in blocks))
 
-    def test_array_bsize(self):
-        n_partitions = 10
-        n_samples = 107
-        data = self.sc.parallelize([np.array([1]) for i in range(n_samples)],
-                                   n_partitions)
+#         block_data_10 = block(data, bsize=10)
+#         blocks = block_data_10.collect()
+#         assert_true(all(len(b) <= 10 for b in blocks))
 
-        block_data_5 = block(data, bsize=5)
-        blocks = block_data_5.collect()
-        assert_true(all(len(b) <= 5 for b in blocks))
+#     def test_sparse_matrix(self):
+#         n_partitions = 10
+#         n_samples = 100
+#         sparse_row = sp.csr_matrix([[0, 0, 1, 0, 1]])
+#         data = self.sc.parallelize([sparse_row for i in range(n_samples)],
+#                                    n_partitions)
+#         blocked_data = block(data)
+#         assert_true(sp.issparse(blocked_data.first()))
 
-        block_data_10 = block(data, bsize=10)
-        blocks = block_data_10.collect()
-        assert_true(all(len(b) <= 10 for b in blocks))
+#         expected_block = sp.vstack([sparse_row] * 10)
+#         assert_array_almost_equal(expected_block.toarray(),
+#                                   blocked_data.first().toarray())
 
-    def test_sparse_matrix(self):
-        n_partitions = 10
-        n_samples = 100
-        sparse_row = sp.csr_matrix([[0, 0, 1, 0, 1]])
-        data = self.sc.parallelize([sparse_row for i in range(n_samples)],
-                                   n_partitions)
-        blocked_data = block(data)
-        assert_true(sp.issparse(blocked_data.first()))
+#     def test_block_rdd_tuple(self):
+#         n_partitions = 10
+#         n_samples = 100
+#         sparse_row = sp.csr_matrix([[0, 0, 1, 0, 1]])
+#         data = self.sc.parallelize(
+#             [(np.array([1., 2.]), 0, sparse_row) for i in range(n_samples)],
+#             n_partitions)
+#         blocked_data = block(data)
 
-        expected_block = sp.vstack([sparse_row] * 10)
-        assert_array_almost_equal(expected_block.toarray(),
-                                  blocked_data.first().toarray())
+#         expected_first_block = np.array([[1., 2.]] * 10)
+#         expected_second_block = np.zeros(10, dtype=np.int)
+#         expected_third_block = sp.vstack([sparse_row] * 10)
 
-    def test_block_rdd_tuple(self):
-        n_partitions = 10
-        n_samples = 100
-        sparse_row = sp.csr_matrix([[0, 0, 1, 0, 1]])
-        data = self.sc.parallelize(
-            [(np.array([1., 2.]), 0, sparse_row) for i in range(n_samples)],
-            n_partitions)
-        blocked_data = block(data)
+#         first_block_tuple = blocked_data.first()
+#         assert_array_almost_equal(expected_first_block, first_block_tuple[0])
+#         assert_array_almost_equal(expected_second_block, first_block_tuple[1])
+#         assert_array_almost_equal(expected_third_block.toarray(),
+#                                   first_block_tuple[2].toarray())
 
-        expected_first_block = np.array([[1., 2.]] * 10)
-        expected_second_block = np.zeros(10, dtype=np.int)
-        expected_third_block = sp.vstack([sparse_row] * 10)
+#         tuple_blocks = blocked_data.collect()
+#         assert_equal(len(tuple_blocks), n_partitions)
+#         assert_equal(sum(len(b[0]) for b in tuple_blocks), n_samples)
+#         assert_equal(sum(len(b[1]) for b in tuple_blocks), n_samples)
 
-        first_block_tuple = blocked_data.first()
-        assert_array_almost_equal(expected_first_block, first_block_tuple[0])
-        assert_array_almost_equal(expected_second_block, first_block_tuple[1])
-        assert_array_almost_equal(expected_third_block.toarray(),
-                                  first_block_tuple[2].toarray())
+#     def test_block_rdd_dict(self):
+#         n_partitions = 3
+#         n_samples = 57
+#         dicts = [{'a': i, 'b': float(i) ** 2} for i in range(n_samples)]
+#         data = self.sc.parallelize(dicts, n_partitions)
 
-        tuple_blocks = blocked_data.collect()
-        assert_equal(len(tuple_blocks), n_partitions)
-        assert_equal(sum(len(b[0]) for b in tuple_blocks), n_samples)
-        assert_equal(sum(len(b[1]) for b in tuple_blocks), n_samples)
-
-    def test_block_rdd_dict(self):
-        n_partitions = 3
-        n_samples = 57
-        dicts = [{'a': i, 'b': float(i) ** 2} for i in range(n_samples)]
-        data = self.sc.parallelize(dicts, n_partitions)
-
-        block_data_5 = block(data, bsize=5)
-        blocks = block_data_5.collect()
-        assert_true(all(len(b) <= 5 for b in blocks))
-        assert_array_almost_equal(blocks[0][0], np.arange(5))
-        assert_array_almost_equal(blocks[0][1],
-                                  np.arange(5, dtype=np.float) ** 2)
+#         block_data_5 = block(data, bsize=5)
+#         blocks = block_data_5.collect()
+#         assert_true(all(len(b) <= 5 for b in blocks))
+#         assert_array_almost_equal(blocks[0][0], np.arange(5))
+#         assert_array_almost_equal(blocks[0][1],
+#                                   np.arange(5, dtype=np.float) ** 2)
 
 
 class TestBlockRDD(SplearnTestCase):
@@ -144,13 +136,17 @@ class TestBlockRDD(SplearnTestCase):
 
         blocked = BlockRDD(rdd)
         assert_is_instance(blocked, BlockRDD)
-        assert_equal(blocked.first(), range(10))
-        assert_equal(blocked.collect(), np.arange(100).reshape(10, 10).tolist())
+        expected = tuple(range(10))
+        assert_equal(blocked.first(), expected)
+        expected = [tuple(v) for v in np.arange(100).reshape(10, 10)]
+        assert_equal(blocked.collect(), expected)
 
         blocked = BlockRDD(rdd, bsize=4)
         assert_is_instance(blocked, BlockRDD)
-        assert_equal(blocked.first(), range(4))
-        assert_equal([len(x) for x in blocked.collect()], [4, 4, 2] * 10)
+        expected = tuple(range(4))
+        assert_equal(blocked.first(), expected)
+        expected = [4, 4, 2] * 10
+        assert_equal([len(x) for x in blocked.collect()], expected)
 
     def test_dtypes(self):
         rdd = self.generate()
@@ -223,7 +219,7 @@ class TestBlockRDD(SplearnTestCase):
         assert_equal(unblocked, range(1000))
 
 
-class TestArrayRDD(SplearnTestCase):
+class TestDenseSparseArrayRDD(SplearnTestCase):
 
     def test_initialization(self):
         n_partitions = 4
@@ -379,9 +375,7 @@ class TestArrayRDD(SplearnTestCase):
         assert_array_equal(X[-3].first(), expected)
 
     def test_get_multiple_item(self):
-        data = np.arange(400).reshape((100, 4))
-        rdd = self.sc.parallelize(data, 4)
-        X = ArrayRDD(rdd, 5)
+        X, X_rdd = self.make_dense_range_rdd((100, 4), block_size=5)
 
         exp0th = np.arange(0, 20).reshape((5, 4))
         exp1st = np.arange(20, 40).reshape((5, 4))
@@ -390,19 +384,17 @@ class TestArrayRDD(SplearnTestCase):
         exp18th = np.arange(360, 380).reshape((5, 4))
         exp19th = np.arange(380, 400).reshape((5, 4))
 
-        assert_array_equal(X[[0, 1]].collect(), [exp0th, exp1st])
-        assert_array_equal(X[[0, 2]].collect(), [exp0th, exp2nd])
-        assert_array_equal(X[[0, -1]].collect(), [exp0th, exp19th])
-        assert_array_equal(X[[0, -2]].collect(), [exp0th, exp18th])
-        assert_array_equal(X[[1, -2]].collect(), [exp1st, exp18th])
-        assert_array_equal(X[[7, 0]].collect(), [exp7th, exp0th])
-        assert_array_equal(X[[1, 2, 7, 19]].collect(),
+        assert_array_equal(X_rdd[[0, 1]].collect(), [exp0th, exp1st])
+        assert_array_equal(X_rdd[[0, 2]].collect(), [exp0th, exp2nd])
+        assert_array_equal(X_rdd[[0, -1]].collect(), [exp0th, exp19th])
+        assert_array_equal(X_rdd[[0, -2]].collect(), [exp0th, exp18th])
+        assert_array_equal(X_rdd[[1, -2]].collect(), [exp1st, exp18th])
+        assert_array_equal(X_rdd[[7, 0]].collect(), [exp7th, exp0th])
+        assert_array_equal(X_rdd[[1, 2, 7, 19]].collect(),
                            [exp1st, exp2nd, exp7th, exp19th])
 
     def test_array_slice_syntax(self):
-        data = np.arange(400).reshape((100, 4))
-        rdd = self.sc.parallelize(data, 4)
-        X = ArrayRDD(rdd, 5)
+        X, X_rdd = self.make_dense_range_rdd((100, 4), block_size=5)
 
         exp0th = np.arange(0, 20).reshape((5, 4))
         exp1st = np.arange(20, 40).reshape((5, 4))
@@ -411,79 +403,69 @@ class TestArrayRDD(SplearnTestCase):
         exp9th = np.arange(180, 200).reshape((5, 4))
         exp18th = np.arange(360, 380).reshape((5, 4))
         exp19th = np.arange(380, 400).reshape((5, 4))
-
-        assert_array_equal(X[:1].collect(), [exp0th])
-        assert_array_equal(X[:2].collect(), [exp0th, exp1st])
-        assert_array_equal(X[18:].collect(), [exp18th, exp19th])
-        assert_array_equal(X[-1:].collect(), [exp19th])
-        assert_array_equal(X[-2:].collect(), [exp18th, exp19th])
-        assert_array_equal(X[7:10].collect(), [exp7th, exp8th, exp9th])
-        assert_array_equal(X[7:10:2].collect(), [exp7th, exp9th])
-        assert_array_equal(X[::9].collect(), [exp0th, exp9th, exp18th])
-        assert_array_equal(X[::-10].collect(), [exp19th, exp9th])
-        assert_array_equal(X[-1:1].collect(), [])
+        print X_rdd.first()
+        assert_array_equal(X_rdd[:1]._rdd.collect(), [exp0th])
+        assert_array_equal(X_rdd[:2].collect(), [exp0th, exp1st])
+        assert_array_equal(X_rdd[18:].collect(), [exp18th, exp19th])
+        assert_array_equal(X_rdd[-1:].collect(), [exp19th])
+        assert_array_equal(X_rdd[-2:].collect(), [exp18th, exp19th])
+        assert_array_equal(X_rdd[7:10].collect(), [exp7th, exp8th, exp9th])
+        assert_array_equal(X_rdd[7:10:2].collect(), [exp7th, exp9th])
+        assert_array_equal(X_rdd[::9].collect(), [exp0th, exp9th, exp18th])
+        assert_array_equal(X_rdd[::-10].collect(), [exp19th, exp9th])
+        assert_array_equal(X_rdd[-1:1].collect(), [])
 
     def test_transform(self):
-        data = np.arange(400).reshape((100, 4))
-        rdd = self.sc.parallelize(data, 4)
-        X = ArrayRDD(rdd, 5)
+        X, X_rdd = self.make_dense_rdd((100, 4))
 
         fn = lambda x: x ** 2
-        X1 = map(fn, X.collect())
-        X2 = X.transform(fn).collect()
+        X1 = map(fn, X_rdd.collect())
+        X2 = X_rdd.transform(fn).collect()
 
         assert_array_equal(X1, X2)
 
-    def test_sum(self):
-        data = np.arange(400).reshape((100, 4))
-        rdd = self.sc.parallelize(data)
-        assert_equal(ArrayRDD(rdd).sum(), data.sum())
-        assert_array_equal(ArrayRDD(rdd).sum(axis=0), data.sum(axis=0))
-        assert_array_equal(ArrayRDD(rdd).sum(axis=1), data.sum(axis=1))
+    def test_sum_dense(self):
+        X, X_rdd = self.make_dense_rdd((100, 4))
+        assert_almost_equal(X_rdd.sum(), X.sum())
+        assert_array_almost_equal(X_rdd.sum(axis=0), X.sum(axis=0))
+        assert_array_almost_equal(X_rdd.sum(axis=1), X.sum(axis=1))
 
-        data = np.arange(600).reshape((100, 3, 2))
-        rdd = self.sc.parallelize(data)
-        assert_equal(ArrayRDD(rdd).sum(), data.sum())
-        assert_array_equal(ArrayRDD(rdd).sum(axis=0), data.sum(axis=0))
-        assert_array_equal(ArrayRDD(rdd).sum(axis=1), data.sum(axis=1))
-        assert_array_equal(ArrayRDD(rdd).sum(axis=2), data.sum(axis=2))
+        X, X_rdd = self.make_dense_rdd((100, 3, 2))
+        assert_almost_equal(X_rdd.sum(), X.sum())
+        assert_array_almost_equal(X_rdd.sum(axis=0), X.sum(axis=0))
+        assert_array_almost_equal(X_rdd.sum(axis=1), X.sum(axis=1))
+        assert_array_almost_equal(X_rdd.sum(axis=2), X.sum(axis=2))
 
     def test_sum_sparse(self):
-        data, rdd = self.generate_sparse_dataset()
-        assert_almost_equal(ArrayRDD(rdd).sum(), data.sum())
-        assert_array_almost_equal(ArrayRDD(rdd).sum(axis=0), data.sum(axis=0))
-        assert_array_almost_equal(ArrayRDD(rdd).sum(axis=1), data.sum(axis=1))
+        X, X_rdd = self.make_sparse_rdd()
+        assert_almost_equal(X_rdd.sum(), X.sum())
+        assert_array_almost_equal(X_rdd.sum(axis=0), X.sum(axis=0))
+        assert_array_almost_equal(X_rdd.sum(axis=1), X.sum(axis=1))
 
-    def generate_sparse_dataset(self, shape=(1e3, 10), bsize=None):
-        data = sp.rand(shape[0], shape[1], random_state=2, density=0.1)
-        X = [sp.csr_matrix([row]) for row in data.toarray()]
-        X_rdd = ArrayRDD(self.sc.parallelize(X, 4), bsize)
-        return data, X_rdd
-
-    def test_dot(self):
-        a = np.arange(200).reshape(20, 10)
-        b = np.arange(200).reshape(10, 20)
-        a_rdd = ArrayRDD(self.sc.parallelize(a))
-        assert_array_almost_equal(unpack(a_rdd.dot(b)), a.dot(b))
+    def test_dot_dense(self):
+        A, A_rdd = self.make_dense_rdd((20, 10))
+        B, B_rdd = self.make_dense_rdd((10, 20))
+        print A_rdd.dot(B).first()
+        assert_array_almost_equal(A_rdd.dot(B).toarray(), A.dot(B))
+        assert_array_almost_equal(B_rdd.dot(A).toarray(), B.dot(A))
 
     def test_dot_sparse(self):
-        a, a_rdd = self.generate_sparse_dataset(shape=(10, 20))
-        b = sp.rand(20, 10, random_state=2, density=0.1)
-        assert_array_almost_equal(unpack(a_rdd.dot(b)).toarray(),
-                                  a.dot(b).toarray())
+        A, A_rdd = self.make_sparse_rdd((20, 10))
+        B, B_rdd = self.make_sparse_rdd((10, 20))
+        assert_array_almost_equal(A_rdd.dot(B).toarray(), A.dot(B).toarray())
+        assert_array_almost_equal(B_rdd.dot(A).toarray(), B.dot(A).toarray())
 
-    def test_mean(self):
-        data = np.arange(600).reshape((100, 3, 2))
-        rdd = self.sc.parallelize(data)
-        assert_equal(ArrayRDD(rdd).mean(), data.mean())
-        assert_array_equal(ArrayRDD(rdd).mean(axis=0), data.mean(axis=0))
-        assert_array_equal(ArrayRDD(rdd).mean(axis=1), data.mean(axis=1))
+    def test_mean_dense(self):
+        X, X_rdd = self.make_dense_rdd((100, 3, 2))
+        assert_almost_equal(X_rdd.mean(), X.mean())
+        assert_array_almost_equal(X_rdd.mean(axis=0), X.mean(axis=0))
+        assert_array_almost_equal(X_rdd.mean(axis=1), X.mean(axis=1))
 
     def test_mean_sparse(self):
-        data, rdd = self.generate_sparse_dataset()
-        assert_almost_equal(ArrayRDD(rdd).mean(), data.mean())
-        assert_array_almost_equal(ArrayRDD(rdd).mean(axis=0), data.mean(axis=0))
-        assert_array_almost_equal(ArrayRDD(rdd).mean(axis=1), data.mean(axis=1))
+        X, X_rdd = self.make_sparse_rdd()
+        assert_almost_equal(X_rdd.mean(), X.mean())
+        assert_array_almost_equal(X_rdd.mean(axis=0), X.mean(axis=0))
+        assert_array_almost_equal(X_rdd.mean(axis=1), X.mean(axis=1))
 
 
 class TestDictRDD(SplearnTestCase):
