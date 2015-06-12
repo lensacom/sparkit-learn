@@ -71,7 +71,7 @@ Sparkit-learn introduces two important distributed data format:
        # array([ 0,  1,  2, ... 17, 18, 19])
 
        # pyspark.rdd operations will still work
-       X.numPartitions() # 2 - number of partitions
+       X.getNumPartitions() # 2 - number of partitions
 
 -  **DictRDD:**
 
