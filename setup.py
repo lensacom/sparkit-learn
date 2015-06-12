@@ -24,7 +24,6 @@ def setup_package():
         license='Apache License, Version 2.0',
         url='https://github.com/lensacom/sparkit-learn',
         packages=['splearn',
-                  'splearn.rdd',
                   'splearn.cluster',
                   'splearn.decomposition',
                   'splearn.feature_extraction',
