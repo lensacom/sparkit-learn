@@ -36,7 +36,7 @@ Sparkit-learn introduces two important distributed data format:
        rdd = sc.parallelize(data, 2) # each partition with 10 elements
        # ArrayRDD
        # each partition will contain blocks with 5 elements
-       X = ArrayRDD(rdd, block_size=5) # 4 blocks, 2 in each partition
+       X = ArrayRDD(rdd, bsize=5) # 4 blocks, 2 in each partition
 
    Basic operations:
 
@@ -71,7 +71,7 @@ Sparkit-learn introduces two important distributed data format:
        # array([ 0,  1,  2, ... 17, 18, 19])
 
        # pyspark.rdd operations will still work
-       X.numPartitions() # 2 - number of partitions
+       X.getNumPartitions() # 2 - number of partitions
 
 -  **DictRDD:**
 
@@ -84,19 +84,19 @@ Sparkit-learn introduces two important distributed data format:
        X = range(20)
        y = range(2) * 10
        # PySpark RDD with 2 partitions
-       X_rdd = sc.parallelize(data_X, 2) # each partition with 10 elements
-       y_rdd = sc.parallelize(data_y, 2) # each partition with 10 elements
+       X_rdd = sc.parallelize(X, 2) # each partition with 10 elements
+       y_rdd = sc.parallelize(y, 2) # each partition with 10 elements
        zipped_rdd = X_rdd.zip(y_rdd) # zip the two rdd's together
        # DictRDD
        # each partition will contain blocks with 5 elements
-       Z = DictRDD(zipped_rdd, columns=('X', 'y'),  block_size=5) # 4 blocks, 2/partition
+       Z = DictRDD(zipped_rdd, columns=('X', 'y'),  bsize=5) # 4 blocks, 2/partition
 
        # or:
        import numpy as np
 
        data = np.array([range(20), range(2)*10]).T
        rdd = sc.parallelize(data, 2)
-       Z = DictRDD(rdd, columns=('X', 'y'),  block_size=5)
+       Z = DictRDD(rdd, columns=('X', 'y'),  bsize=5)
 
    Basic operations:
 
