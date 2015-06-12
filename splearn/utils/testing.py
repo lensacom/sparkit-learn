@@ -88,8 +88,3 @@ class SplearnTestCase(unittest.TestCase):
         X_rows = [sp.csr_matrix([row]) for row in X.toarray()]
         X_rdd = ArrayRDD(self.sc.parallelize(X_rows, 4), block_size)
         return X, X_rdd
-
-    def make_dense_randint_rdd(self, shape=(1e3, 10), low_high=(0, 1), block_size=None):
-        X = np.random.randint(low_high[0], low_high[1], size=shape)
-        X_rdd = ArrayRDD(self.sc.parallelize(X, 4), block_size)
-        return X, X_rdd
