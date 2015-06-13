@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from setuptools import setup
+from setuptools import find_packages
 
 import splearn
 import sys
@@ -23,14 +24,7 @@ def setup_package():
         author_email='krisztian.szucs@lensa.com, andras.fulop@lensa.com',
         license='Apache License, Version 2.0',
         url='https://github.com/lensacom/sparkit-learn',
-        packages=['splearn',
-                  'splearn.cluster',
-                  'splearn.decomposition',
-                  'splearn.feature_extraction',
-                  'splearn.feature_selection',
-                  'splearn.linear_model',
-                  'splearn.svm'],
-        
+        packages=find_packages(),
         long_description=open('./README.rst').read(),
         install_requires=open('./requirements.txt').read().split()
     )
