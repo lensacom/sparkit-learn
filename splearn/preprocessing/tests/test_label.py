@@ -1,8 +1,7 @@
-import numpy as np
-
 from sklearn.preprocessing import LabelEncoder
 from splearn.preprocessing import SparkLabelEncoder
 from splearn.utils.testing import SplearnTestCase, assert_array_equal
+
 
 class TestSparkLabelEncoder(SplearnTestCase):
 

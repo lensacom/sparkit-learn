@@ -1,11 +1,14 @@
-from ..base import SparkTransformerMixin, SparkBroadcasterMixin
-from sklearn.preprocessing import LabelEncoder
-from sklearn.utils import column_or_1d
-from sklearn.preprocessing.label import _check_numpy_unicode_bug
-
 import numpy as np
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing.label import _check_numpy_unicode_bug
+from sklearn.utils import column_or_1d
 
-class SparkLabelEncoder(LabelEncoder, SparkTransformerMixin, SparkBroadcasterMixin):
+from ..base import SparkBroadcasterMixin, SparkTransformerMixin
+
+
+class SparkLabelEncoder(LabelEncoder, SparkTransformerMixin,
+                        SparkBroadcasterMixin):
+
     """Encode labels with value between 0 and n_classes-1.
     Read more in the :ref:`User Guide <preprocessing_targets>`.
     Attributes
@@ -85,7 +88,8 @@ class SparkLabelEncoder(LabelEncoder, SparkTransformerMixin, SparkBroadcasterMix
         -------
         y : ArrayRDD [n_samples]
         """
-        mapper = self.broadcast(super(SparkLabelEncoder, self).transform, y.context)
+        mapper = super(SparkLabelEncoder, self).transform
+        mapper = self.broadcast(mapper, y.context)
         return y.transform(mapper)
 
     def inverse_transform(self, y):
@@ -98,5 +102,6 @@ class SparkLabelEncoder(LabelEncoder, SparkTransformerMixin, SparkBroadcasterMix
         -------
         y : ArrayRDD [n_samples]
         """
-        mapper = self.broadcast(super(SparkLabelEncoder, self).inverse_transform, y.context)
+        mapper = super(SparkLabelEncoder, self).inverse_transform
+        mapper = self.broadcast(mapper, y.context)
         return y.transform(mapper)
