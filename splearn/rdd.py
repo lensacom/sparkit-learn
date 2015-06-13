@@ -7,6 +7,15 @@ import scipy.sparse as sp
 from pyspark import RDD
 
 
+def _auto_dtype(elem):
+    if sp.issparse(elem):
+        return sp.spmatrix
+    elif isinstance(elem, np.ndarray):
+        return np.ndarray
+    else:
+        return tuple
+
+
 def _check_dtype(block, dtype):
     if not isinstance(block, dtype):
         raise ValueError("Type mismatch. Expected {0}, {1} given.".format(
@@ -53,7 +62,6 @@ def _block_tuple(iterator, dtypes, bsize=None):
     for tuple_i in iterator:
         if blocked_tuple is None:
             blocked_tuple = tuple([] for _ in range(len(tuple_i)))
-            dtypes = dtypes or (None,) * len(blocked_tuple)
 
         if (bsize > 0) and (i >= bsize):
             yield tuple(_pack_accumulated(x, dtype)
@@ -69,42 +77,46 @@ def _block_tuple(iterator, dtypes, bsize=None):
                     for x, dtype in zip(blocked_tuple, dtypes))
 
 
-# def block(rdd, bsize=None, dtype=None):
-#     """Block an RDD
+def block(rdd, bsize=None, dtype=None):
+    """Block an RDD
 
-#     Parameters
-#     ----------
+    Parameters
+    ----------
 
-#     rdd : RDD
-#         RDD of data points to block into either numpy arrays,
-#         scipy sparse matrices, or pandas data frames.
-#         Type of data point will be automatically inferred
-#         and blocked accordingly.
+    rdd : RDD
+        RDD of data points to block into either numpy arrays,
+        scipy sparse matrices, or pandas data frames.
+        Type of data point will be automatically inferred
+        and blocked accordingly.
 
-#     bsize : int, optional, default None
-#         Size of each block (number of elements), if None all data points
-#         from each partition will be combined in a block.
+    bsize : int, optional, default None
+        Size of each block (number of elements), if None all data points
+        from each partition will be combined in a block.
 
-#     Returns
-#     -------
+    Returns
+    -------
 
-#     rdd : ArrayRDD or TupleRDD or DictRDD
-#         The transformed rdd with added functionality
-#     """
-#     try:
-#         entry = rdd.first()
-#     except IndexError:
-#         # empty RDD: do not block
-#         return rdd
+    rdd : ArrayRDD or TupleRDD or DictRDD
+        The transformed rdd with added functionality
+    """
+    try:
+        entry = rdd.first()
+    except IndexError:
+        # empty RDD: do not block
+        return rdd
 
-#     # do different kinds of block depending on the type
-#     if isinstance(entry, dict):
-#         rdd = rdd.map(lambda x: x.values())
-#         return DictRDD(rdd, entry.keys(), bsize, dtype)
-#     elif isinstance(entry, tuple):
-#         return DictRDD(rdd, bsize, dtype)
-#     else:  # Fallback to array packing
-#         return ArrayRDD(rdd, bsize, dtype)
+    # do different kinds of block depending on the type
+    if isinstance(entry, dict):
+        rdd = rdd.map(lambda x: x.values())
+        return DictRDD(rdd, entry.keys(), bsize, dtype)
+    elif isinstance(entry, tuple):
+        return DictRDD(rdd, bsize, dtype)
+    elif sp.issparse(entry):
+        return SparseRDD(rdd, bsize)
+    elif isinstance(entry, np.ndarray):
+        return ArrayRDD(rdd, bsize)
+    else:
+        return BlockRDD(rdd, bsize, dtype)
 
 
 class BlockRDD(object):
@@ -306,13 +318,10 @@ class ArrayLikeRDDMixin(object):
         if axis in (None, 0):
             return self._rdd.map(lambda x: x.sum(axis=axis)).sum()
         else:
-            dtype = self.dtype
             return self._rdd.map(lambda x: x.sum(axis=axis)) \
-                            .reduce(lambda a, b: _unpack_blocks([a, b], dtype))
+                            .reduce(lambda a, b: np.concatenate([a, b]))
 
     def mean(self, axis=None):
-        dtype = self.dtype
-
         def mapper(x):
             """Calculate statistics for every numpy or scipy blocks."""
             cnt = np.prod(x.shape) if axis is None else x.shape[axis]
@@ -326,7 +335,7 @@ class ArrayLikeRDDMixin(object):
             if axis in (None, 0):
                 mean_ab = ((mean_a * n_a) + (mean_b * n_b)) / n_ab
             else:
-                mean_ab = _unpack_blocks([mean_a, mean_b], dtype)
+                mean_ab = np.concatenate([mean_a, mean_b])
             return n_ab, mean_ab
 
         n, mean = self._rdd.map(mapper).treeReduce(reducer)
@@ -511,7 +520,7 @@ class DictRDD(BlockRDD):
             raise ValueError("Columns parameter must be iterable!")
 
         if dtype is None:
-            dtype = [None] * len(columns)
+            dtype = [_auto_dtype(elem) for elem in rdd.first()]
         elif len(columns) != len(dtype):
             raise ValueError("Columns and dtype lengths must be equal!")
 
