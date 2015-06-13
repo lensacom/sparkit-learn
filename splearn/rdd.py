@@ -581,12 +581,15 @@ class DictRDD(BlockRDD):
                            noblock=True)
         else:
             index = self.columns.index(key)
+            dtype = self.dtype[index]
+            bsize = self.bsize
             rdd = self._rdd.map(lambda x: x[index])
-            if self.dtype[index] is None:
-                return ArrayRDD(rdd, bsize=self.bsize, noblock=True)
+            if dtype is np.ndarray:
+                return ArrayRDD(rdd, bsize=bsize, noblock=True)
+            elif dtype is sp.spmatrix:
+                return SparseRDD(rdd, bsize=bsize, noblock=True)
             else:
-                return BlockRDD(rdd, bsize=self.bsize, dtype=self.dtype[index],
-                                noblock=True)
+                return BlockRDD(rdd, bsize=bsize, dtype=dtype, noblock=True)
 
     def __getitem__(self, key):
         """Access a specified block.
@@ -658,4 +661,3 @@ class DictRDD(BlockRDD):
 
         return self.__class__(self._rdd.map(mapper), noblock=True,
                               **self.get_params())
-
