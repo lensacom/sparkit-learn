@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
+import sys
+
 from setuptools import setup
 
 import splearn
-import sys
 
 
 def is_numpy_installed():
@@ -30,7 +31,7 @@ def setup_package():
                   'splearn.feature_selection',
                   'splearn.linear_model',
                   'splearn.svm'],
-        
+
         long_description=open('./README.rst').read(),
         install_requires=open('./requirements.txt').read().split()
     )

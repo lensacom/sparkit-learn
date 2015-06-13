@@ -10,7 +10,7 @@ from sklearn.utils.testing import (assert_almost_equal,
                                    assert_array_almost_equal,
                                    assert_array_equal, assert_equal,
                                    assert_raises, assert_true)
-from splearn.rdd import ArrayRDD, SparseRDD, DictRDD
+from splearn.rdd import ArrayRDD, DictRDD, SparseRDD
 
 
 def assert_tuple_equal(tpl1, tpl2):
