@@ -42,7 +42,8 @@ Sparkit-learn introduces two important distributed data format:
 
    .. code:: python
 
-       len(X) # 4 - number of blocks
+       len(X) # 20 - number of elements
+       X.blocks # 4 - number of blocks
        X.shape # (20,) - the shape of the whole dataset
 
        X # returns an ArrayRDD
@@ -102,7 +103,7 @@ Sparkit-learn introduces two important distributed data format:
 
    .. code:: python
 
-       len(Z) # 4 - number of blocks
+       Z.blocks # 4 - number of blocks
        Z.shape # (20,2) - the shape of the whole dataset
        Z.columns # returns ('X', 'y')
 
@@ -152,8 +153,8 @@ SparkCountVectorizer
     local_vect = CountVectorizer()
     dist_vect = SparkCountVectorizer()
 
-    result_local = local.fit_transform(X)
-    result_dist = dist.fit_transform(X_rdd)  # ArrayRDD
+    result_local = local_vect.fit_transform(X)
+    result_dist = dist_vect.fit_transform(X_rdd)  # ArrayRDD
 
 SparkHashingVectorizer
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -170,8 +171,8 @@ SparkHashingVectorizer
     local_vect = HashingVectorizer()
     dist_vect = SparkHashingVectorizer()
 
-    result_local = local.fit_transform(X)
-    result_dist = dist.fit_transform(X_rdd)  # ArrayRDD
+    result_local = local_vect.fit_transform(X)
+    result_dist = dist_vect.fit_transform(X_rdd)  # ArrayRDD
 
 SparkTfidfTransformer
 ^^^^^^^^^^^^^^^^^^^^^
@@ -221,7 +222,7 @@ Distributed Classifiers
     X = [...]  # list of texts
     y = [...]  # list of labels
     X_rdd = sc.parallelize(X, 4)
-    y_rdd = sc.parralelize(y, 4)
+    y_rdd = sc.parallelize(y, 4)
     Z = DictRDD(X_rdd.zip(y_rdd), columns=('X', 'y'))
 
     local_pipeline = Pipeline((
@@ -248,7 +249,7 @@ Distributed Model Selection
 
     from splearn.rdd import DictRDD
     from splearn.grid_search import SparkGridSearchCV
-    from sklearn.naive_bayes import SparkMultinomialNB
+    from splearn.naive_bayes import SparkMultinomialNB
 
     from sklearn.grid_search import GridSearchCV
     from sklearn.naive_bayes import MultinomialNB
@@ -256,7 +257,7 @@ Distributed Model Selection
     X = [...]
     y = [...]
     X_rdd = sc.parallelize(X, 4)
-    y_rdd = sc.parralelize(y, 4)
+    y_rdd = sc.parallelize(y, 4)
     Z = DictRDD(X_rdd.zip(y_rdd), columns=('X', 'y'))
 
     parameters = {'alpha': [0.1, 1, 10]}
