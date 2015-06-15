@@ -3,9 +3,11 @@
 from sklearn.feature_extraction import DictVectorizer
 
 from ..rdd import DictRDD
+from ..base import SparkBroadcasterMixin
+from pyspark import AccumulatorParam
 
 
-class SparkDictVectorizer(DictVectorizer):
+class SparkDictVectorizer(DictVectorizer, SparkBroadcasterMixin):
 
     """Transforms DictRDDs containing feature-value mappings to vectors.
     This transformer turns lists of mappings (dict-like objects) of feature
@@ -65,6 +67,8 @@ class SparkDictVectorizer(DictVectorizer):
     [[ 0.  0.  4.]]
     """
 
+    __transient__ = ['vocabulary_', 'feature_names_']
+
     def fit(self, Z):
         """Learn a list of feature name -> indices mappings.
 
@@ -80,8 +84,30 @@ class SparkDictVectorizer(DictVectorizer):
         """
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
 
-        feature_names = X.map(self._fit).reduce(lambda a, b: a.union(b))
-        feature_names = list(feature_names)
+        """Create vocabulary
+        """
+        class SetAccum(AccumulatorParam):
+
+            def zero(self, initialValue):
+                return set(initialValue)
+
+            def addInPlace(self, v1, v2):
+                v1 |= v2
+                return v1
+
+        accum = X.context.accumulator(set(), SetAccum())
+
+        def mapper(X, separator=self.separator):
+            feature_names = []
+            for x in X:
+                for f, v in x.iteritems():
+                    if isinstance(v, basestring):
+                        f = "%s%s%s" % (f, separator, v)
+                    feature_names.append(f)
+            accum.add(set(feature_names))
+
+        X.foreach(mapper)  # init vocabulary
+        feature_names = list(accum.value)
         feature_names.sort()
 
         vocab = dict((f, i) for i, f in enumerate(feature_names))
@@ -90,27 +116,6 @@ class SparkDictVectorizer(DictVectorizer):
         self.vocabulary_ = vocab
 
         return self
-
-    def _fit(self, X):
-        """Extracts the unique feature names from a list of Mappings.
-
-        Parameters
-        ----------
-        X : List of mappings
-
-        Returns
-        -------
-        set of features
-        """
-        feature_names = []
-
-        for x in X:
-            for f, v in x.iteritems():
-                if isinstance(v, basestring):
-                    f = "%s%s%s" % (f, self.separator, v)
-                feature_names.append(f)
-
-        return set(feature_names)
 
     def transform(self, Z):
         """Transform ArrayRDD's (or DictRDD's 'X' column's) feature->value dicts
@@ -130,11 +135,9 @@ class SparkDictVectorizer(DictVectorizer):
         Z : transformed, containing {array, sparse matrix}
             Feature vectors; always 2-d.
         """
-        f = super(SparkDictVectorizer, self).transform
-        if isinstance(Z, DictRDD):
-            return Z.transform(f, column='X')
-        else:
-            return Z.transform(f)
+        mapper = self.broadcast(super(SparkDictVectorizer, self).transform,
+                                Z.context)
+        return Z.transform(mapper, column='X')
 
     def fit_transform(self, Z):
         """Learn a list of feature name -> indices mappings and transform Z.
