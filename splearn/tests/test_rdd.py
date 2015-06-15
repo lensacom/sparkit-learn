@@ -427,51 +427,82 @@ class TestArrayRDD(SplearnTestCase):
 
 class TestDenseMath(SplearnTestCase):
 
-    def test_sum_dense(self):
-        X, X_rdd = self.make_dense_rdd((100, 4))
-        assert_almost_equal(X_rdd.sum(), X.sum())
-        assert_array_almost_equal(X_rdd.sum(axis=0), X.sum(axis=0))
-        assert_array_almost_equal(X_rdd.sum(axis=1), X.sum(axis=1))
+    def _test_func_on_axis(self, func):
+        X, X_rdd = self.make_dense_rdd(block_size=100)
+        assert_almost_equal(getattr(X_rdd, func)(), getattr(X, func)())
+        for axes in (0, 1):
+            print axes
+            assert_array_almost_equal(getattr(X_rdd, func)(axis=axes),
+                                      getattr(X, func)(axis=axes))
 
         X, X_rdd = self.make_dense_rdd((100, 3, 2))
-        assert_almost_equal(X_rdd.sum(), X.sum())
-        assert_array_almost_equal(X_rdd.sum(axis=0), X.sum(axis=0))
-        assert_array_almost_equal(X_rdd.sum(axis=1), X.sum(axis=1))
-        assert_array_almost_equal(X_rdd.sum(axis=2), X.sum(axis=2))
+        assert_almost_equal(getattr(X_rdd, func)(), getattr(X, func)())
+        for axes in (0, 1, 2):
+            print axes
+            assert_array_almost_equal(getattr(X_rdd, func)(axis=axes),
+                                      getattr(X, func)(axis=axes))
 
-    def test_dot_dense(self):
+    def test_min(self):
+        self._test_func_on_axis('min')
+
+    def test_max(self):
+        self._test_func_on_axis('max')
+
+    def test_sum(self):
+        self._test_func_on_axis('sum')
+
+    def test_prod(self):
+        self._test_func_on_axis('prod')
+
+    def test_mean(self):
+        self._test_func_on_axis('mean')
+
+    def test_dot(self):
         A, A_rdd = self.make_dense_rdd((20, 10))
         B, B_rdd = self.make_dense_rdd((10, 20))
         print A_rdd.dot(B).first()
         assert_array_almost_equal(A_rdd.dot(B).toarray(), A.dot(B))
         assert_array_almost_equal(B_rdd.dot(A).toarray(), B.dot(A))
 
-    def test_mean_dense(self):
+    def test_flatten(self):
         X, X_rdd = self.make_dense_rdd((100, 3, 2))
-        assert_almost_equal(X_rdd.mean(), X.mean())
-        assert_array_almost_equal(X_rdd.mean(axis=0), X.mean(axis=0))
-        assert_array_almost_equal(X_rdd.mean(axis=1), X.mean(axis=1))
+        X = X.flatten()
+        X_rdd = X_rdd.flatten()
+        assert_array_equal(X_rdd.toarray(), X)
 
 
 class TestSparseMath(SplearnTestCase):
 
-    def test_sum_sparse(self):
-        X, X_rdd = self.make_sparse_rdd()
-        assert_almost_equal(X_rdd.sum(), X.sum())
-        assert_array_almost_equal(X_rdd.sum(axis=0), X.sum(axis=0))
-        assert_array_almost_equal(X_rdd.sum(axis=1), X.sum(axis=1))
+    def _test_func_on_axis(self, func, toarray=True):
+        X, X_rdd = self.make_sparse_rdd(block_size=100)
+        assert_almost_equal(getattr(X_rdd, func)(), getattr(X, func)())
+        for axes in (0, 1):
+            if toarray:
+                assert_array_almost_equal(
+                    getattr(X_rdd, func)(axis=axes).toarray(),
+                    getattr(X, func)(axis=axes).toarray())
+            else:
+                assert_array_almost_equal(
+                    getattr(X_rdd, func)(axis=axes),
+                    getattr(X, func)(axis=axes))
 
-    def test_dot_sparse(self):
+    def test_min(self):
+        self._test_func_on_axis('min')
+
+    def test_max(self):
+        self._test_func_on_axis('max')
+
+    def test_sum(self):
+        self._test_func_on_axis('sum', toarray=False)
+
+    def test_mean(self):
+        self._test_func_on_axis('mean', toarray=False)
+
+    def test_dot(self):
         A, A_rdd = self.make_sparse_rdd((20, 10))
         B, B_rdd = self.make_sparse_rdd((10, 20))
         assert_array_almost_equal(A_rdd.dot(B).toarray(), A.dot(B).toarray())
         assert_array_almost_equal(B_rdd.dot(A).toarray(), B.dot(A).toarray())
-
-    def test_mean_sparse(self):
-        X, X_rdd = self.make_sparse_rdd()
-        assert_almost_equal(X_rdd.mean(), X.mean())
-        assert_array_almost_equal(X_rdd.mean(axis=0), X.mean(axis=0))
-        assert_array_almost_equal(X_rdd.mean(axis=1), X.mean(axis=1))
 
 
 class TestDictRDD(SplearnTestCase):
