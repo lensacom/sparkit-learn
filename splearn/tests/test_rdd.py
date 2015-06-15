@@ -403,7 +403,7 @@ class TestArrayRDD(SplearnTestCase):
         exp9th = np.arange(180, 200).reshape((5, 4))
         exp18th = np.arange(360, 380).reshape((5, 4))
         exp19th = np.arange(380, 400).reshape((5, 4))
-        print X_rdd.first()
+
         assert_array_equal(X_rdd[:1]._rdd.collect(), [exp0th])
         assert_array_equal(X_rdd[:2].collect(), [exp0th, exp1st])
         assert_array_equal(X_rdd[18:].collect(), [exp18th, exp19th])
@@ -431,14 +431,12 @@ class TestDenseMath(SplearnTestCase):
         X, X_rdd = self.make_dense_rdd(block_size=100)
         assert_almost_equal(getattr(X_rdd, func)(), getattr(X, func)())
         for axes in (0, 1):
-            print axes
             assert_array_almost_equal(getattr(X_rdd, func)(axis=axes),
                                       getattr(X, func)(axis=axes))
 
         X, X_rdd = self.make_dense_rdd((100, 3, 2))
         assert_almost_equal(getattr(X_rdd, func)(), getattr(X, func)())
         for axes in (0, 1, 2):
-            print axes
             assert_array_almost_equal(getattr(X_rdd, func)(axis=axes),
                                       getattr(X, func)(axis=axes))
 
@@ -460,7 +458,6 @@ class TestDenseMath(SplearnTestCase):
     def test_dot(self):
         A, A_rdd = self.make_dense_rdd((20, 10))
         B, B_rdd = self.make_dense_rdd((10, 20))
-        print A_rdd.dot(B).first()
         assert_array_almost_equal(A_rdd.dot(B).toarray(), A.dot(B))
         assert_array_almost_equal(B_rdd.dot(A).toarray(), B.dot(A))
 
