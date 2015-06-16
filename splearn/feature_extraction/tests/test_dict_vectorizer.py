@@ -4,6 +4,7 @@ from splearn.feature_extraction import SparkDictVectorizer
 from splearn.rdd import ArrayRDD
 from splearn.utils.testing import (SplearnTestCase, assert_array_equal,
                                    assert_equal)
+from splearn.utils.validation import check_rdd
 
 
 class TestDictVectorizer(SplearnTestCase):
@@ -26,7 +27,9 @@ class TestDictVectorizer(SplearnTestCase):
         dist = SparkDictVectorizer()
 
         result_local = local.fit_transform(X)
-        result_dist = sp.vstack(dist.fit_transform(X_rdd).collect())
+        result_dist = dist.fit_transform(X_rdd)
+        result_collected = sp.vstack(result_dist.collect())
 
+        check_rdd(result_dist, {'X', (sp.spmatrix,)})
         assert_equal(local.vocabulary_, dist.vocabulary_)
-        assert_array_equal(result_local.toarray(), result_dist.toarray())
+        assert_array_equal(result_local.toarray(), result_collected.toarray())

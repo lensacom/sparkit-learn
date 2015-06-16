@@ -7,6 +7,7 @@ from splearn.feature_extraction.text import (SparkCountVectorizer,
                                              SparkTfidfTransformer)
 from splearn.utils.testing import (SplearnTestCase, assert_array_almost_equal,
                                    assert_array_equal, assert_equal)
+from splearn.utils.validation import check_rdd
 
 
 class TestCountVectorizer(SplearnTestCase):
@@ -85,7 +86,8 @@ class TestTfidfTransformer(SplearnTestCase):
         dist = SparkTfidfTransformer()
 
         Z_local = local.fit_transform(X)
-        Z_dist = sp.vstack(dist.fit_transform(X_rdd).collect())
-
+        Z_dist = dist.fit_transform(X_rdd)
+        Z_collected = sp.vstack(Z_dist.collect())
+        check_rdd(Z_dist, {'X': [sp.spmatrix]})
         assert_array_almost_equal(Z_local.toarray(),
-                                  Z_dist.toarray())
+                                  Z_collected.toarray())

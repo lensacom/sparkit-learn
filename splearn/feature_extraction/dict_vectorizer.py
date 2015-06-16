@@ -3,6 +3,7 @@
 from sklearn.feature_extraction import DictVectorizer
 
 from ..rdd import DictRDD
+from ..utils.validation import check_rdd
 
 
 class SparkDictVectorizer(DictVectorizer):
@@ -78,6 +79,7 @@ class SparkDictVectorizer(DictVectorizer):
         -------
         self
         """
+        check_rdd(Z, {'X': (dict,)})
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
 
         feature_names = X.map(self._fit).reduce(lambda a, b: a.union(b))
@@ -130,6 +132,7 @@ class SparkDictVectorizer(DictVectorizer):
         Z : transformed, containing {array, sparse matrix}
             Feature vectors; always 2-d.
         """
+        check_rdd(Z, {'X': (dict,)})
         f = super(SparkDictVectorizer, self).transform
         if isinstance(Z, DictRDD):
             return Z.transform(f, column='X')
