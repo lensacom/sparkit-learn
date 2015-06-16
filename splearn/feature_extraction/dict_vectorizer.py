@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import numpy as np
 from sklearn.feature_extraction import DictVectorizer
 
 from ..rdd import DictRDD
@@ -79,8 +80,8 @@ class SparkDictVectorizer(DictVectorizer):
         -------
         self
         """
-        check_rdd(Z, {'X': (dict,)})
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
+        check_rdd(X, (np.ndarray,))
 
         feature_names = X.map(self._fit).reduce(lambda a, b: a.union(b))
         feature_names = list(feature_names)
@@ -132,7 +133,8 @@ class SparkDictVectorizer(DictVectorizer):
         Z : transformed, containing {array, sparse matrix}
             Feature vectors; always 2-d.
         """
-        check_rdd(Z, {'X': (dict,)})
+        X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
+        check_rdd(X, (np.ndarray,))
         f = super(SparkDictVectorizer, self).transform
         if isinstance(Z, DictRDD):
             return Z.transform(f, column='X')

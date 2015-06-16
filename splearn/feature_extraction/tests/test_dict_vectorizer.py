@@ -1,10 +1,11 @@
 import scipy.sparse as sp
+import numpy as np
 from sklearn.feature_extraction import DictVectorizer
 from splearn.feature_extraction import SparkDictVectorizer
 from splearn.rdd import ArrayRDD
 from splearn.utils.testing import (SplearnTestCase, assert_array_equal,
-                                   assert_equal)
-from splearn.utils.validation import check_rdd
+                                   assert_equal, assert_true)
+from splearn.utils.validation import check_rdd_dtype
 
 
 class TestDictVectorizer(SplearnTestCase):
@@ -30,6 +31,6 @@ class TestDictVectorizer(SplearnTestCase):
         result_dist = dist.fit_transform(X_rdd)
         result_collected = sp.vstack(result_dist.collect())
 
-        check_rdd(result_dist, {'X', (sp.spmatrix,)})
+        assert_true(check_rdd_dtype(result_dist, (np.ndarray,)))
         assert_equal(local.vocabulary_, dist.vocabulary_)
         assert_array_equal(result_local.toarray(), result_collected.toarray())

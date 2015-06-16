@@ -543,7 +543,7 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
 
         Parameters
         ----------
-        Z : ArrayRDD or DictRDD containing sparse matrices
+        Z : ArrayRDD or DictRDD containing (sparse matrices|ndarray)
             a matrix of term/token counts
 
         Returns
@@ -551,8 +551,8 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
         self : TfidfVectorizer
         """
 
-        check_rdd(Z, {'X': (np.ndarray, sp.spmatrix)})
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
+        check_rdd(X, (sp.spmatrix, np.ndarray))
 
         def mapper(X, use_idf=self.use_idf):
             if not sp.issparse(X):
@@ -589,8 +589,8 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
         -------
         Z : ArrayRDD/DictRDD containing sparse matrices
         """
-
-        check_rdd(Z, {'X': (np.ndarray, sp.spmatrix)})
+        X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
+        check_rdd(X, (sp.spmatrix, np.ndarray))
         mapper = super(SparkTfidfTransformer, self).transform
 
         if self.use_idf:
