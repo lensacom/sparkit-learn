@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.sparse as sp
-from splearn.rdd import ArrayRDD, SparseRDD, DictRDD
+from splearn.rdd import BlockRDD, ArrayRDD, SparseRDD, DictRDD
 
 
 def check_rdd(rdd, expected_dtype):
@@ -19,6 +19,9 @@ def check_rdd(rdd, expected_dtype):
     accept: bool
         Returns if the types are matched.
     """
+    if not isinstance(rdd, BlockRDD):
+        raise TypeError("Expected {0} for parameter rdd, got {1}." \
+                        .format(BlockRDD, type(rdd)))
     if isinstance(rdd, DictRDD):
         if not isinstance(expected_dtype, dict):
             raise TypeError('Expected {0} for parameter '

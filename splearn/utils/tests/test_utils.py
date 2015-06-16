@@ -33,3 +33,4 @@ class TestUtilities(SplearnTestCase):
         assert_false(check_rdd(dict_rdd, {'X': spmat}))
 
         assert_raises(TypeError, check_rdd, (dict_rdd, (tuple,)))
+        assert_raises(TypeError, check_rdd, (np.arange(20), (array,)))
