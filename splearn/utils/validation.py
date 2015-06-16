@@ -3,7 +3,7 @@ import scipy.sparse as sp
 from splearn.rdd import BlockRDD, ArrayRDD, SparseRDD, DictRDD
 
 
-def check_rdd(rdd, expected_dtype):
+def check_rdd_dtype(rdd, expected_dtype):
     """Checks if the blocks in the RDD matches the expected types.
 
     Parameters:
@@ -39,3 +39,18 @@ def check_rdd(rdd, expected_dtype):
         expected_dtype = [expected_dtype]
 
     return rdd.dtype in expected_dtype
+
+def check_rdd(rdd, expected_dtype):
+    """Wrapper function to check_rdd_dtype. Raises TypeError in case of dtype
+    mismatch.
+
+    Parameters:
+    -----------
+    rdd: splearn.BlockRDD
+        The RDD to check
+    expected_dtype: {type, list of types, tuple of types, dict of types}
+        Expected type(s). If the RDD is a DictRDD the parameter type is
+        restricted to dict.
+    """
+    if not check_rdd_type(rdd, expected_dtype):
+        raise TypeError("{0} dtype mismatch.".format(rdd))
