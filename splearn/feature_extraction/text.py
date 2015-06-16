@@ -18,6 +18,7 @@ from sklearn.utils.validation import check_is_fitted
 
 from ..base import SparkBroadcasterMixin
 from ..rdd import DictRDD
+from ..utils.validation import check_rdd
 
 
 class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
@@ -550,6 +551,7 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
         self : TfidfVectorizer
         """
 
+        check_rdd(Z, {'X': (np.ndarray, sp.spmatrix)})
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
 
         def mapper(X, use_idf=self.use_idf):
@@ -588,6 +590,7 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
         Z : ArrayRDD/DictRDD containing sparse matrices
         """
 
+        check_rdd(Z, {'X': (np.ndarray, sp.spmatrix)})
         mapper = super(SparkTfidfTransformer, self).transform
 
         if self.use_idf:
