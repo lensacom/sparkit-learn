@@ -45,17 +45,23 @@ class TestVarianceThreshold(SplearnTestCase):
         Z_rdd = DictRDD([X_sparse_rdd, X_dense_rdd], columns=('X', 'Y'))
 
         result_local = local.fit_transform(X_dense)
-        result_dist = np.vstack(dist.fit_transform(X_dense_rdd).collect())
-        assert_array_almost_equal(result_local, result_dist)
+        result_dist = dist.fit_transform(X_dense_rdd)
+        result_collected = np.vstack(result_dist.collect())
+        assert_true(check_rdd_dtype(result_dist, (np.ndarray,)))
+        assert_array_almost_equal(result_local, result_collected)
 
         result_local = local.fit_transform(X_sparse)
-        result_dist = sp.vstack(dist.fit_transform(X_sparse_rdd).collect())
+        result_dist = dist.fit_transform(X_sparse_rdd)
+        result_collected = sp.vstack(result_dist.collect())
+        assert_true(check_rdd_dtype(result_dist, (sp.spmatrix,)))
         assert_array_almost_equal(result_local.toarray(),
-                                  result_dist.toarray())
+                                  result_collected.toarray())
 
-        result_dist = sp.vstack(dist.fit_transform(Z_rdd)[:, 'X'].collect())
+        result_dist = dist.fit_transform(Z_rdd)[:, 'X']
+        result_collected = sp.vstack(result_dist.collect())
+        assert_true(check_rdd_dtype(result_dist, (sp.spmatrix,)))
         assert_array_almost_equal(result_local.toarray(),
-                                  result_dist.toarray())
+                                  result_collected.toarray())
 
     def test_same_transform_with_treshold(self):
         local = VarianceThreshold(.03)
