@@ -52,5 +52,5 @@ def check_rdd(rdd, expected_dtype):
         Expected type(s). If the RDD is a DictRDD the parameter type is
         restricted to dict.
     """
-    if not check_rdd_type(rdd, expected_dtype):
+    if not check_rdd_dtype(rdd, expected_dtype):
         raise TypeError("{0} dtype mismatch.".format(rdd))

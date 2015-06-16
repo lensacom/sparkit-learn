@@ -35,7 +35,7 @@ class TestUtilities(SplearnTestCase):
         assert_raises(TypeError, check_rdd_dtype, (dict_rdd, (tuple,)))
         assert_raises(TypeError, check_rdd_dtype, (np.arange(20), (array,)))
 
-    def test_check_rdd_dtype(self):
+    def test_check_rdd(self):
         array = np.ndarray
         spmat = sp.spmatrix
 
