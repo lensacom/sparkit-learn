@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
+import scipy.sparse as sp
 from sklearn.feature_extraction import DictVectorizer
 
 from ..rdd import DictRDD
 from ..utils.validation import check_rdd
+from ..base import SparkBroadcasterMixin
 
 
-class SparkDictVectorizer(DictVectorizer):
+class SparkDictVectorizer(DictVectorizer, SparkBroadcasterMixin):
 
     """Transforms DictRDDs containing feature-value mappings to vectors.
     This transformer turns lists of mappings (dict-like objects) of feature
@@ -66,6 +68,8 @@ class SparkDictVectorizer(DictVectorizer):
     >>> print np.concatenate(v.transform(ArrayRDD(test)).collect())
     [[ 0.  0.  4.]]
     """
+
+    __transient__ = ['feature_names_', 'vocabulary_']
 
     def fit(self, Z):
         """Learn a list of feature name -> indices mappings.
@@ -135,11 +139,12 @@ class SparkDictVectorizer(DictVectorizer):
         """
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
         check_rdd(X, (np.ndarray,))
-        f = super(SparkDictVectorizer, self).transform
-        if isinstance(Z, DictRDD):
-            return Z.transform(f, column='X')
-        else:
-            return Z.transform(f)
+
+        mapper = self.broadcast(
+            super(SparkDictVectorizer, self).transform, Z.context)
+
+        dtype = sp.spmatrix if self.sparse else np.ndarray
+        return Z.transform(mapper, column='X', dtype=dtype)
 
     def fit_transform(self, Z):
         """Learn a list of feature name -> indices mappings and transform Z.

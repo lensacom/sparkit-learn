@@ -120,4 +120,5 @@ class SparkKMeans(KMeans):
                 X = X.tolist()
             return self._mllib_model.predict(X)
         else:
-            return X.map(lambda X: super(SparkKMeans, self).predict(X))
+            rdd = X.map(lambda X: super(SparkKMeans, self).predict(X))
+            return ArrayRDD(rdd)

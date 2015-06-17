@@ -18,11 +18,11 @@ class TestCountVectorizer(SplearnTestCase):
         local = CountVectorizer()
         dist = SparkCountVectorizer()
 
-        result_local = local.fit_transform(X)
-        result_dist = sp.vstack(dist.fit_transform(X_rdd).collect())
+        result_local = local.fit_transform(X).toarray()
+        result_dist = dist.fit_transform(X_rdd).toarray()
 
         assert_equal(local.vocabulary_, dist.vocabulary_)
-        assert_array_equal(result_local.toarray(), result_dist.toarray())
+        assert_array_equal(result_local, result_dist)
 
     def test_limit_features(self):
         X, X_rdd = self.make_text_rdd()
@@ -36,14 +36,14 @@ class TestCountVectorizer(SplearnTestCase):
             local = CountVectorizer(**paramset)
             dist = SparkCountVectorizer(**paramset)
 
-            result_local = local.fit_transform(X)
-            result_dist = sp.vstack(dist.fit_transform(X_rdd).collect())
+            result_local = local.fit_transform(X).toarray()
+            result_dist = dist.fit_transform(X_rdd).toarray()
 
             assert_equal(local.vocabulary_, dist.vocabulary_)
-            assert_array_equal(result_local.toarray(), result_dist.toarray())
+            assert_array_equal(result_local, result_dist)
 
-            result_dist = sp.vstack(dist.transform(X_rdd).collect())
-            assert_array_equal(result_local.toarray(), result_dist.toarray())
+            result_dist = dist.transform(X_rdd).toarray()
+            assert_array_equal(result_local, result_dist)
 
 
 class TestHashingVectorizer(SplearnTestCase):
@@ -53,9 +53,9 @@ class TestHashingVectorizer(SplearnTestCase):
         local = HashingVectorizer()
         dist = SparkHashingVectorizer()
 
-        result_local = local.transform(X)
-        result_dist = sp.vstack(dist.transform(X_rdd).collect())
-        assert_array_equal(result_local.toarray(), result_dist.toarray())
+        result_local = local.transform(X).toarray()
+        result_dist = dist.transform(X_rdd).toarray()
+        assert_array_equal(result_local, result_dist)
 
     def test_dummy_analyzer(self):
         X, X_rdd = self.make_text_rdd()
@@ -68,13 +68,13 @@ class TestHashingVectorizer(SplearnTestCase):
         local = HashingVectorizer(analyzer=lambda x: x)
         dist = SparkHashingVectorizer(analyzer=lambda x: x)
 
-        result_local = local.transform(X)
-        result_dist = sp.vstack(dist.transform(X_rdd).collect())
-        assert_array_equal(result_local.toarray(), result_dist.toarray())
+        result_local = local.transform(X).toarray()
+        result_dist = dist.transform(X_rdd).toarray()
+        assert_array_equal(result_local, result_dist)
 
-        result_local = local.fit_transform(X)
-        result_dist = sp.vstack(dist.fit_transform(X_rdd).collect())
-        assert_array_equal(result_local.toarray(), result_dist.toarray())
+        result_local = local.fit_transform(X).toarray()
+        result_dist = dist.fit_transform(X_rdd).toarray()
+        assert_array_equal(result_local, result_dist)
 
 
 class TestTfidfTransformer(SplearnTestCase):
@@ -88,7 +88,7 @@ class TestTfidfTransformer(SplearnTestCase):
 
         Z_local = local.fit_transform(X)
         Z_dist = dist.fit_transform(X_rdd)
-        Z_collected = sp.vstack(Z_dist.collect())
-        assert_true(check_rdd_dtype(Z_dist, (np.ndarray,)))
+
+        assert_true(check_rdd_dtype(Z_dist, sp.spmatrix))
         assert_array_almost_equal(Z_local.toarray(),
-                                  Z_collected.toarray())
+                                  Z_dist.toarray())

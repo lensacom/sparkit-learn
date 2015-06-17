@@ -322,9 +322,10 @@ class SparkTruncatedSVD(TruncatedSVD, SparkBroadcasterMixin):
         """
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
         check_rdd(X, (sp.spmatrix, np.ndarray))
-        mapper = super(SparkTruncatedSVD, self).transform
-        mapper = self.broadcast(mapper, Z.context)
-        return Z.transform(mapper, column='X')
+
+        mapper = self.broadcast(
+            super(SparkTruncatedSVD, self).transform, Z.context)
+        return Z.transform(mapper, column='X', dtype=np.ndarray)
 
     def inverse_transform(self, Z):
         """Transform X back to its original space.
@@ -343,6 +344,7 @@ class SparkTruncatedSVD(TruncatedSVD, SparkBroadcasterMixin):
         """
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
         check_rdd(X, (sp.spmatrix, np.ndarray))
-        mapper = super(SparkTruncatedSVD, self).inverse_transform
-        mapper = self.broadcast(mapper, Z.context)
-        return Z.transform(mapper, column='X')
+
+        mapper = self.broadcast(
+            super(SparkTruncatedSVD, self).inverse_transform, Z.context)
+        return Z.transform(mapper, column='X', dtype=np.ndarray)

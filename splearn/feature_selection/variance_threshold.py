@@ -107,6 +107,7 @@ class SparkVarianceThreshold(VarianceThreshold, SparkSelectorMixin):
         """
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
         check_rdd(X, (np.ndarray, sp.spmatrix))
-        mapper = super(SparkVarianceThreshold, self).transform
-        mapper = self.broadcast(mapper, Z.context)
+
+        mapper = self.broadcast(
+            super(SparkVarianceThreshold, self).transform, Z.context)
         return Z.transform(mapper, column='X')

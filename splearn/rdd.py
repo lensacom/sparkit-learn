@@ -254,12 +254,20 @@ class BlockRDD(object):
         rdd = self._rdd.map(lambda x: np.array(x))
         return np.concatenate(rdd.collect())
 
-    def transform(self, f, *args, **kwargs):
+    def transform(self, fn, dtype=None, *args, **kwargs):
         """Equivalent to map, compatibility purpose only.
         Column parameter ignored.
         """
-        rdd = self._rdd.map(f)
-        return self.__class__(rdd, noblock=True, **self.get_params())
+        rdd = self._rdd.map(fn)
+
+        if dtype is None:
+            return self.__class__(rdd, noblock=True, **self.get_params())
+        if dtype is np.ndarray:
+            return ArrayRDD(rdd, bsize=self.bsize, noblock=True)
+        elif dtype is sp.spmatrix:
+            return SparseRDD(rdd, bsize=self.bsize, noblock=True)
+        else:
+            return BlockRDD(rdd, bsize=self.bsize, dtype=dtype, noblock=True)
 
     # def cartesian(self, other):
     #     return TupleRDD(self._rdd.cartesian(other._rdd), False)
@@ -520,8 +528,8 @@ class DictRDD(BlockRDD):
     def __init__(self, rdd, columns=None, bsize=-1, dtype=None,
                  noblock=False):
         if hasattr(rdd, '__iter__'):
-            def zipper(xxx_todo_changeme):
-                (a, b) = xxx_todo_changeme
+            def zipper(a_b):
+                (a, b) = a_b
                 if not isinstance(a, tuple):
                     a = (a,)
                 return a + (b,)
@@ -539,9 +547,8 @@ class DictRDD(BlockRDD):
             elif not all(isinstance(r, RDD) for r in rdd):
                 raise TypeError("All element must be an instance of RDD or"
                                 " BlockRDD!")
-            rdd = functools.reduce(
-                lambda t, x: t.zip(x).map(zipper), rdd
-            ).persist()
+            rdd = functools.reduce(lambda t, x: t.zip(x).map(zipper), rdd) \
+                           .persist()
         elif isinstance(rdd, (RDD, BlockRDD)):
             if columns is None:
                 columns = list(range(len(rdd.first())))
@@ -653,7 +660,7 @@ class DictRDD(BlockRDD):
         """
         return self._rdd.flatMap(lambda cols: list(zip(*cols)))
 
-    def transform(self, fn, column=None):
+    def transform(self, fn, column=None, dtype=None):
         """Execute a transformation on a column or columns. Returns the modified
         DictRDD.
 
@@ -664,6 +671,8 @@ class DictRDD(BlockRDD):
         column : {str, list or None}
             The column(s) to transform. If None is specified the method is
             equivalent to map.
+        column : {str, list or None}
+            The dtype of the column(s) to transform.
 
         Returns
         -------
@@ -672,12 +681,19 @@ class DictRDD(BlockRDD):
 
         TODO: optimize
         """
+        dtypes = self.dtype
         if column is None:
             indices = list(range(len(self.columns)))
         else:
             if not hasattr(column, '__iter__'):
                 column = [column]
             indices = [self.columns.index(c) for c in column]
+
+        if dtype is not None:
+            if not hasattr(dtype, '__iter__'):
+                dtype = [dtype]
+            dtypes = [dtype[i] if i in indices else t
+                      for i, t in enumerate(self.dtype)]
 
         def mapper(values):
             result = fn(*[values[i] for i in indices])
@@ -694,5 +710,6 @@ class DictRDD(BlockRDD):
             return tuple(result[indices.index(i)] if i in indices else v
                          for i, v in enumerate(values))
 
-        return self.__class__(self._rdd.map(mapper), noblock=True,
-                              **self.get_params())
+        return DictRDD(self._rdd.map(mapper),
+                       columns=self.columns, dtype=dtypes,
+                       bsize=self.bsize, noblock=True)

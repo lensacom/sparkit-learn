@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.sparse as sp
 from pyspark import RDD
-from splearn.rdd import ArrayRDD, BlockRDD, DictRDD, block
+from splearn.rdd import ArrayRDD, SparseRDD, BlockRDD, DictRDD, block
 from splearn.utils.testing import (SplearnTestCase, assert_almost_equal,
                                    assert_array_almost_equal,
                                    assert_array_equal, assert_equal,
@@ -423,6 +423,16 @@ class TestArrayRDD(SplearnTestCase):
         X2 = X_rdd.transform(fn).collect()
 
         assert_array_equal(X1, X2)
+
+    def test_transform_dtype(self):
+        X, X_rdd = self.make_dense_rdd((100, 4))
+
+        rdd = X_rdd.transform(lambda x: x)
+        assert_is_instance(rdd, ArrayRDD)
+        rdd = X_rdd.transform(lambda x: x.tolist(), dtype=list)
+        assert_is_instance(rdd, BlockRDD)
+        rdd = X_rdd.transform(lambda x: sp.lil_matrix(x), dtype=sp.spmatrix)
+        assert_is_instance(rdd, SparseRDD)
 
 
 class TestDenseMath(SplearnTestCase):

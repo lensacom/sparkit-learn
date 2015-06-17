@@ -50,9 +50,9 @@ class SplearnTestCase(unittest.TestCase):
                                n_samples=n_samples, n_features=20,
                                n_informative=10, random_state=42)
 
-        X_rdd = self.sc.parallelize(X)
-        y_rdd = self.sc.parallelize(y)
-        Z = DictRDD(X_rdd.zip(y_rdd), columns=('X', 'y'), bsize=blocks)
+        X_rdd = ArrayRDD(self.sc.parallelize(X))
+        y_rdd = ArrayRDD(self.sc.parallelize(y))
+        Z = DictRDD([X_rdd, y_rdd], columns=('X', 'y'), bsize=blocks)
 
         return X, y, Z
 
@@ -66,9 +66,9 @@ class SplearnTestCase(unittest.TestCase):
         if nonnegative:
             X = np.abs(X)
 
-        X_rdd = self.sc.parallelize(X, 4)
-        y_rdd = self.sc.parallelize(y, 4)
-        Z = DictRDD(X_rdd.zip(y_rdd), columns=('X', 'y'), bsize=blocks)
+        X_rdd = ArrayRDD(self.sc.parallelize(X, 4))
+        y_rdd = ArrayRDD(self.sc.parallelize(y, 4))
+        Z = DictRDD([X_rdd, y_rdd], columns=('X', 'y'), bsize=blocks)
 
         return X, y, Z
 
