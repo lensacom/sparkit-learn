@@ -106,14 +106,16 @@ class SparkDictVectorizer(DictVectorizer, SparkBroadcasterMixin):
             feature_names = []
             for x in X:
                 for f, v in six.iteritems(x):
-                    if isinstance(v, basestring):
-                        f = "%s%s%s" % (f, separator, v)
+                    if isinstance(v, six.string_types):
+                        f = "%s%s%s" % (f, self.separator, v)
                     feature_names.append(f)
             accum.add(set(feature_names))
 
         X.foreach(mapper)  # init vocabulary
         feature_names = list(accum.value)
-        feature_names.sort()
+
+        if self.sort:
+            feature_names.sort()
 
         vocab = dict((f, i) for i, f in enumerate(feature_names))
 
