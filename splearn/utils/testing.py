@@ -2,6 +2,7 @@ import unittest
 
 import numpy as np
 import scipy.sparse as sp
+from nose.tools import assert_is_instance
 from pyspark import SparkContext
 from sklearn.datasets import make_blobs, make_classification, make_regression
 from sklearn.feature_extraction.tests.test_text import ALL_FOOD_DOCS

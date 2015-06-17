@@ -7,6 +7,7 @@ import scipy.sparse as sp
 from sklearn.externals import six
 from sklearn.externals.joblib import Parallel, delayed
 from sklearn.pipeline import FeatureUnion, Pipeline, _name_estimators
+from splearn.rdd import ArrayRDD, DictRDD
 
 
 class SparkPipeline(Pipeline):

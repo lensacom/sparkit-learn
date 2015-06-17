@@ -523,7 +523,7 @@ class TestDictRDD(SplearnTestCase):
         assert_is_instance(DictRDD(rdd), BlockRDD)
 
     def test_creation_from_rdds(self):
-        x, y, z = np.arange(80).reshape((40, 2))
+        x = np.arange(80).reshape((40, 2))
         y = np.arange(40)
         z = list(range(40))
         x_rdd = self.sc.parallelize(x, 4)
@@ -545,7 +545,7 @@ class TestDictRDD(SplearnTestCase):
         assert_is_instance(first[2], list)
 
     def test_creation_from_blocked_rdds(self):
-        x, y, z = np.arange(80).reshape((40, 2))
+        x = np.arange(80).reshape((40, 2))
         y = np.arange(40)
         z = list(range(40))
         x_rdd = ArrayRDD(self.sc.parallelize(x, 4))
