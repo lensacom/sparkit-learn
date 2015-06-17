@@ -32,15 +32,6 @@ def _pack_accumulated(accumulated, dtype):
         return dtype(accumulated)
 
 
-# def _unpack_blocks(blocks, dtype):
-#     if dtype is np.ndarray:
-#         return np.array(blocks)
-#     elif dtype is sp.spmatrix:
-#         return sp.vstack(blocks)
-#     else:
-#         dtype(itertools.chain(*blocks))
-
-
 def _block_collection(iterator, dtype, bsize=-1):
     """Pack rdd with a specific collection constructor."""
     i = 0
@@ -126,7 +117,6 @@ class BlockRDD(object):
         if isinstance(rdd, BlockRDD):
             _check_dtype(rdd.first(), dtype)
             self._rdd = rdd._rdd
-            dtype = rdd.dtype
             bsize = rdd.bsize
         elif isinstance(rdd, RDD):
             if not noblock:
@@ -425,12 +415,6 @@ class ArrayRDD(BlockRDD, ArrayLikeRDDMixin):
 
     def prod(self, axis=None):
         return self._on_axis('prod', axis)
-
-    def std(self):
-        pass
-
-    def var(self):
-        pass
 
 
 class SparseRDD(BlockRDD, ArrayLikeRDDMixin):
