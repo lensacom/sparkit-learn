@@ -33,7 +33,7 @@ class TestBlocking(SplearnTestCase):
         data = self.sc.parallelize([1 for i in range(n_samples)],
                                    n_partitions)
         blocked_data = block(data, dtype=tuple)
-        assert_array_equal(tuple([1] * (n_samples / n_partitions)),
+        assert_array_equal(tuple([1] * (n_samples // n_partitions)),
                            blocked_data.first())
         blocks = blocked_data.collect()
         assert_equal(len(blocks), n_partitions)
@@ -55,7 +55,7 @@ class TestBlocking(SplearnTestCase):
         data = self.sc.parallelize([np.array([1]) for i in range(n_samples)],
                                    n_partitions)
         blocked_data = block(data)
-        assert_array_equal(np.ones((n_samples / n_partitions, 1)),
+        assert_array_equal(np.ones((n_samples // n_partitions, 1)),
                            blocked_data.first())
         blocks = blocked_data.collect()
         assert_equal(len(blocks), n_partitions)
@@ -129,7 +129,7 @@ class TestBlocking(SplearnTestCase):
 class TestBlockRDD(SplearnTestCase):
 
     def generate(self, n_samples=100, n_partitions=10):
-        return self.sc.parallelize(range(n_samples), n_partitions)
+        return self.sc.parallelize(list(range(n_samples)), n_partitions)
 
     def test_creation(self):
         rdd = self.generate()
@@ -195,28 +195,28 @@ class TestBlockRDD(SplearnTestCase):
         blocked = BlockRDD(self.generate(1000, 5))
         unblocked = blocked.unblock()
         assert_is_instance(blocked, BlockRDD)
-        assert_equal(unblocked.collect(), range(1000))
+        assert_equal(unblocked.collect(), list(range(1000)))
 
         blocked = BlockRDD(self.generate(1000, 5), dtype=tuple)
         unblocked = blocked.unblock()
         assert_is_instance(blocked, BlockRDD)
-        assert_equal(unblocked.collect(), range(1000))
+        assert_equal(unblocked.collect(), list(range(1000)))
 
     def test_tolist(self):
         blocked = BlockRDD(self.generate(1000, 5))
         unblocked = blocked.tolist()
         assert_is_instance(blocked, BlockRDD)
-        assert_equal(unblocked, range(1000))
+        assert_equal(unblocked, list(range(1000)))
 
         blocked = BlockRDD(self.generate(1000, 5), dtype=tuple)
         unblocked = blocked.tolist()
         assert_is_instance(blocked, BlockRDD)
-        assert_equal(unblocked, range(1000))
+        assert_equal(unblocked, list(range(1000)))
 
         blocked = BlockRDD(self.generate(1000, 5), dtype=np.array)
         unblocked = blocked.tolist()
         assert_is_instance(blocked, BlockRDD)
-        assert_equal(unblocked, range(1000))
+        assert_equal(unblocked, list(range(1000)))
 
 
 class TestArrayRDD(SplearnTestCase):
@@ -419,7 +419,7 @@ class TestArrayRDD(SplearnTestCase):
         X, X_rdd = self.make_dense_rdd((100, 4))
 
         fn = lambda x: x ** 2
-        X1 = map(fn, X_rdd.collect())
+        X1 = list(map(fn, X_rdd.collect()))
         X2 = X_rdd.transform(fn).collect()
 
         assert_array_equal(X1, X2)
@@ -523,12 +523,17 @@ class TestDictRDD(SplearnTestCase):
         assert_is_instance(DictRDD(rdd), BlockRDD)
 
     def test_creation_from_rdds(self):
-        x, y, z = np.arange(80).reshape((40, 2)), np.arange(40), range(40)
+        x, y, z = np.arange(80).reshape((40, 2))
+        y = np.arange(40)
+        z = list(range(40))
         x_rdd = self.sc.parallelize(x, 4)
         y_rdd = self.sc.parallelize(y, 4)
         z_rdd = self.sc.parallelize(z, 4)
 
-        expected = (np.arange(20).reshape(10, 2), np.arange(10), range(10))
+        expected = (
+            np.arange(20).reshape(10, 2),
+            np.arange(10), list(range(10))
+        )
         rdd = DictRDD([x_rdd, y_rdd, z_rdd])
         assert_tuple_equal(rdd.first(), expected)
         rdd = DictRDD([x_rdd, y_rdd, z_rdd], columns=('x', 'y', 'z'))
@@ -540,12 +545,17 @@ class TestDictRDD(SplearnTestCase):
         assert_is_instance(first[2], list)
 
     def test_creation_from_blocked_rdds(self):
-        x, y, z = np.arange(80).reshape((40, 2)), np.arange(40), range(40)
+        x, y, z = np.arange(80).reshape((40, 2))
+        y = np.arange(40)
+        z = list(range(40))
         x_rdd = ArrayRDD(self.sc.parallelize(x, 4))
         y_rdd = ArrayRDD(self.sc.parallelize(y, 4))
         z_rdd = BlockRDD(self.sc.parallelize(z, 4), dtype=list)
 
-        expected = (np.arange(20).reshape(10, 2), np.arange(10), range(10))
+        expected = (
+            np.arange(20).reshape(10, 2),
+            np.arange(10), list(range(10))
+        )
         rdd = DictRDD([x_rdd, y_rdd, z_rdd])
         assert_tuple_equal(rdd.first(), expected)
         rdd = DictRDD([x_rdd, y_rdd, z_rdd], columns=('x', 'y', 'z'))

@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 
+from functools import reduce
+
 import numpy as np
 import scipy.sparse as sp
 from sklearn.externals import six
 from sklearn.externals.joblib import Parallel, delayed
 from sklearn.pipeline import FeatureUnion, Pipeline, _name_estimators
-from splearn.rdd import ArrayRDD, DictRDD
 
 
 class SparkPipeline(Pipeline):
@@ -234,7 +235,7 @@ class SparkFeatureUnion(FeatureUnion):
                                         self.transformer_weights, **fit_params)
             for name, trans in self.transformer_list)
 
-        Zs, transformers = zip(*result)
+        Zs, transformers = list(zip(*result))
         self._update_transformer_list(transformers)
 
         X = reduce(lambda x, y: x.zip(y._rdd), Zs)

@@ -115,7 +115,7 @@ class SparkGaussianNB(GaussianNB, SparkBaseNB):
             Returns self.
         """
         models = Z[:, ['X', 'y']].map(
-            lambda (X, y): self.partial_fit(X, y, classes))
+            lambda X_y: self.partial_fit(X_y[0], X_y[1], classes))
         avg = models.sum()
         self.__dict__.update(avg.__dict__)
         return self
@@ -200,10 +200,13 @@ class SparkBaseDiscreteNB(BaseDiscreteNB, SparkBaseNB):
         """
         if 'w' in Z.columns:
             models = Z[:, ['X', 'y', 'w']].map(
-                lambda (X, y, w): self.partial_fit(X, y, classes, w))
+                lambda X_y_w: self.partial_fit(
+                    X_y_w[0], X_y_w[1], classes, X_y_w[2]
+                )
+            )
         else:
             models = Z[:, ['X', 'y']].map(
-                lambda (X, y): self.partial_fit(X, y, classes))
+                lambda X_y: self.partial_fit(X_y[0], X_y[1], classes))
         avg = models.sum()
         self.__dict__.update(avg.__dict__)
         return self

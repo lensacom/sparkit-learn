@@ -61,8 +61,8 @@ class TestHashingVectorizer(SplearnTestCase):
 
         def splitter(x):
             return x.split()
-        X = map(splitter, X)
-        X_rdd = X_rdd.map(lambda x: map(splitter, x))
+        X = list(map(splitter, X))
+        X_rdd = X_rdd.map(lambda x: list(map(splitter, x)))
 
         local = HashingVectorizer(analyzer=lambda x: x)
         dist = SparkHashingVectorizer(analyzer=lambda x: x)
@@ -79,7 +79,7 @@ class TestHashingVectorizer(SplearnTestCase):
 class TestTfidfTransformer(SplearnTestCase):
 
     def test_same_transform_result(self):
-        X, y, Z_rdd = self.make_classification(4, 1000, None)
+        X, y, Z_rdd = self.make_classification(4, 1000, -1)
         X_rdd = Z_rdd[:, 'X']
 
         local = TfidfTransformer()

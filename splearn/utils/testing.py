@@ -2,14 +2,10 @@ import unittest
 
 import numpy as np
 import scipy.sparse as sp
-from nose.tools import assert_is_instance
 from pyspark import SparkContext
 from sklearn.datasets import make_blobs, make_classification, make_regression
 from sklearn.feature_extraction.tests.test_text import ALL_FOOD_DOCS
-from sklearn.utils.testing import (assert_almost_equal,
-                                   assert_array_almost_equal,
-                                   assert_array_equal, assert_equal,
-                                   assert_raises, assert_true)
+from sklearn.utils.testing import (assert_array_equal, assert_equal)
 from splearn.rdd import ArrayRDD, DictRDD, SparseRDD
 
 
@@ -40,12 +36,12 @@ class SplearnTestCase(unittest.TestCase):
         # immediately on shutdown
         self.sc._jvm.System.clearProperty("spark.driver.port")
 
-    def make_blobs(self, centers, n_samples, blocks=None):
+    def make_blobs(self, centers, n_samples, blocks=-1):
         X, y = make_blobs(n_samples=n_samples, centers=centers, random_state=42)
         X_rdd = ArrayRDD(self.sc.parallelize(X))
         return X, y, X_rdd
 
-    def make_regression(self, n_targets, n_samples, blocks=None):
+    def make_regression(self, n_targets, n_samples, blocks=-1):
         X, y = make_regression(n_targets=n_targets,
                                n_samples=n_samples, n_features=20,
                                n_informative=10, random_state=42)
@@ -56,7 +52,7 @@ class SplearnTestCase(unittest.TestCase):
 
         return X, y, Z
 
-    def make_classification(self, n_classes, n_samples, blocks=None,
+    def make_classification(self, n_classes, n_samples, blocks=-1,
                             nonnegative=False):
         X, y = make_classification(n_classes=n_classes,
                                    n_samples=n_samples, n_features=5,
@@ -72,23 +68,23 @@ class SplearnTestCase(unittest.TestCase):
 
         return X, y, Z
 
-    def make_text_rdd(self, blocks=None):
+    def make_text_rdd(self, blocks=-1):
         X = ALL_FOOD_DOCS
         X_rdd = ArrayRDD(self.sc.parallelize(X, 4), blocks)
         return X, X_rdd
 
-    def make_dense_rdd(self, shape=(1e3, 10), block_size=None):
+    def make_dense_rdd(self, shape=(1e3, 10), block_size=-1):
         rng = np.random.RandomState(2)
         X = rng.randn(*shape)
         X_rdd = ArrayRDD(self.sc.parallelize(X, 4), bsize=block_size)
         return X, X_rdd
 
-    def make_dense_range_rdd(self, shape=(1e3, 10), block_size=None):
+    def make_dense_range_rdd(self, shape=(1e3, 10), block_size=-1):
         X = np.arange(np.prod(shape)).reshape(shape)
         X_rdd = ArrayRDD(self.sc.parallelize(X, 4), bsize=block_size)
         return X, X_rdd
 
-    def make_sparse_rdd(self, shape=(1e3, 10), block_size=None):
+    def make_sparse_rdd(self, shape=(1e3, 10), block_size=-1):
         X = sp.rand(shape[0], shape[1], random_state=42, density=0.3)
         X_rows = [sp.csr_matrix([row]) for row in X.toarray()]
         X_rdd = SparseRDD(self.sc.parallelize(X_rows, 4), bsize=block_size)

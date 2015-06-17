@@ -1,6 +1,4 @@
-import numpy as np
-import scipy.sparse as sp
-from splearn.rdd import BlockRDD, ArrayRDD, SparseRDD, DictRDD
+from splearn.rdd import DictRDD, BlockRDD
 
 
 def check_rdd(rdd, expected_dtype):
@@ -20,16 +18,16 @@ def check_rdd(rdd, expected_dtype):
         Returns if the types are matched.
     """
     if not isinstance(rdd, BlockRDD):
-        raise TypeError("Expected {0} for parameter rdd, got {1}." \
+        raise TypeError("Expected {0} for parameter rdd, got {1}."
                         .format(BlockRDD, type(rdd)))
     if isinstance(rdd, DictRDD):
         if not isinstance(expected_dtype, dict):
             raise TypeError('Expected {0} for parameter '
-                             'expected_dtype, got {1}.' \
-                             .format(dict, type(expected_dtype)))
+                            'expected_dtype, got {1}.'
+                            .format(dict, type(expected_dtype)))
         accept = True
-        types = dict(zip(rdd.columns, rdd.dtype))
-        for key, values in expected_dtype.iteritems():
+        types = dict(list(zip(rdd.columns, rdd.dtype)))
+        for key, values in expected_dtype.items():
             if not isinstance(values, (tuple, list)):
                 values = [values]
             accept = accept and types[key] in values

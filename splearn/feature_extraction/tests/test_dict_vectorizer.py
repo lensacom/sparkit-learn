@@ -9,7 +9,7 @@ from splearn.utils.validation import check_rdd
 
 class TestDictVectorizer(SplearnTestCase):
 
-    def make_dict_dataset(self, blocks=None):
+    def make_dict_dataset(self, blocks=-1):
         X = [{"foo": 1, "bar": 3},
              {"bar": 4, "baz": 2},
              {"bar": 6, "baz": 1},
