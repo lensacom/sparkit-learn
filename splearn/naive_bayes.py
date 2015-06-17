@@ -6,7 +6,7 @@ from sklearn.base import copy
 from sklearn.naive_bayes import (BaseDiscreteNB, BaseNB, BernoulliNB,
                                  GaussianNB, MultinomialNB)
 from splearn.base import SparkClassifierMixin
-from utils.validation import check_rdd
+from splearn.utils.validation import check_rdd
 
 
 class SparkBaseNB(BaseNB, SparkClassifierMixin):
