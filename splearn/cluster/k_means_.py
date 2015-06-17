@@ -1,10 +1,12 @@
 # encoding: utf-8
 
 import numpy as np
+import scipy.sparse as sp
 from pyspark.mllib.clustering import KMeans as MLlibKMeans
 from sklearn.cluster import KMeans
 
 from ..rdd import ArrayRDD, DictRDD
+from ..utils.validation import check_rdd
 
 
 class SparkKMeans(KMeans):
@@ -81,6 +83,7 @@ class SparkKMeans(KMeans):
         self
         """
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
+        check_rdd(X, (np.ndarray, sp.spmatrix))
         if self.init == 'k-means||':
             self._mllib_model = MLlibKMeans.train(
                 X.unblock(),
@@ -111,6 +114,7 @@ class SparkKMeans(KMeans):
             Index of the cluster each sample belongs to.
 
         """
+        check_rdd(X, (np.ndarray, sp.spmatrix))
         if hasattr(self, '_mllib_model'):
             if isinstance(X, ArrayRDD):
                 X = X.tolist()
