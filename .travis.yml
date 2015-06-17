@@ -30,7 +30,7 @@ before_install:
 
 install:
   - conda create --yes -q -n test-environment python=$PYTHON_VERSION nose numpy
-    scipy scikit-learn scikit-image matplotlib
+    scipy scikit-learn
   - source activate test-environment
   - pip install -r requirements.txt
   - pip install rednose
