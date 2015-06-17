@@ -5,7 +5,10 @@ import scipy.sparse as sp
 from pyspark import SparkContext
 from sklearn.datasets import make_blobs, make_classification, make_regression
 from sklearn.feature_extraction.tests.test_text import ALL_FOOD_DOCS
-from sklearn.utils.testing import (assert_array_equal, assert_equal)
+from sklearn.utils.testing import (assert_almost_equal,
+                                   assert_array_almost_equal,
+                                   assert_array_equal, assert_equal,
+                                   assert_raises, assert_true)
 from splearn.rdd import ArrayRDD, DictRDD, SparseRDD
 
 
