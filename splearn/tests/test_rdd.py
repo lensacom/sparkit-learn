@@ -404,7 +404,7 @@ class TestArrayRDD(SplearnTestCase):
         exp18th = np.arange(360, 380).reshape((5, 4))
         exp19th = np.arange(380, 400).reshape((5, 4))
 
-        assert_array_equal(X_rdd[:1]._rdd.collect(), [exp0th])
+        assert_array_equal(X_rdd[:1].collect(), [exp0th])
         assert_array_equal(X_rdd[:2].collect(), [exp0th, exp1st])
         assert_array_equal(X_rdd[18:].collect(), [exp18th, exp19th])
         assert_array_equal(X_rdd[-1:].collect(), [exp19th])
