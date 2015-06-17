@@ -46,22 +46,19 @@ class TestVarianceThreshold(SplearnTestCase):
 
         result_local = local.fit_transform(X_dense)
         result_dist = dist.fit_transform(X_dense_rdd)
-        result_collected = np.vstack(result_dist.collect())
         assert_true(check_rdd_dtype(result_dist, (np.ndarray,)))
-        assert_array_almost_equal(result_local, result_collected)
+        assert_array_almost_equal(result_local, result_dist.toarray())
 
         result_local = local.fit_transform(X_sparse)
         result_dist = dist.fit_transform(X_sparse_rdd)
-        result_collected = sp.vstack(result_dist.collect())
         assert_true(check_rdd_dtype(result_dist, (sp.spmatrix,)))
         assert_array_almost_equal(result_local.toarray(),
-                                  result_collected.toarray())
+                                  result_dist.toarray())
 
         result_dist = dist.fit_transform(Z_rdd)[:, 'X']
-        result_collected = sp.vstack(result_dist.collect())
         assert_true(check_rdd_dtype(result_dist, (sp.spmatrix,)))
         assert_array_almost_equal(result_local.toarray(),
-                                  result_collected.toarray())
+                                  result_dist.toarray())
 
     def test_same_transform_with_treshold(self):
         local = VarianceThreshold(.03)
@@ -73,19 +70,16 @@ class TestVarianceThreshold(SplearnTestCase):
 
         result_local = local.fit_transform(X_dense)
         result_dist = dist.fit_transform(X_dense_rdd)
-        result_collected = np.vstack(result_dist.collect())
         assert_true(check_rdd_dtype(result_dist, (np.ndarray,)))
-        assert_array_almost_equal(result_local, result_collected)
+        assert_array_almost_equal(result_local, result_dist.toarray())
 
         result_local = local.fit_transform(X_sparse)
         result_dist = dist.fit_transform(X_sparse_rdd)
-        result_collected = sp.vstack(result_dist.collect())
         assert_true(check_rdd_dtype(result_dist, (sp.spmatrix,)))
         assert_array_almost_equal(result_local.toarray(),
-                                  result_collected.toarray())
+                                  result_dist.toarray())
 
         result_dist = dist.fit_transform(Z_rdd)[:, 'X']
-        result_collected = sp.vstack(result_dist.collect())
         assert_true(check_rdd_dtype(result_dist, (sp.spmatrix,)))        
         assert_array_almost_equal(result_local.toarray(),
-                                  result_collected.toarray())
+                                  result_dist.toarray())

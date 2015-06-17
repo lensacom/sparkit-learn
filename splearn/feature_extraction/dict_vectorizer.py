@@ -138,7 +138,7 @@ class SparkDictVectorizer(DictVectorizer, SparkBroadcasterMixin):
             Feature vectors; always 2-d.
         """
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
-        check_rdd(X, (np.ndarray,))
+        check_rdd(X, (np.ndarray, sp.spmatrix))
 
         mapper = self.broadcast(
             super(SparkDictVectorizer, self).transform, Z.context)

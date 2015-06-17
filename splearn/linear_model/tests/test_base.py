@@ -1,7 +1,8 @@
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from splearn.linear_model import SparkLinearRegression
-from splearn.utils.testing import SplearnTestCase, assert_array_almost_equal
+from splearn.utils.testing import SplearnTestCase, assert_array_almost_equal, assert_true
+from splearn.utils.validation import check_rdd_dtype
 
 
 class TestLinearRegression(SplearnTestCase):
@@ -27,4 +28,5 @@ class TestLinearRegression(SplearnTestCase):
         y_local = local.fit(X, y).predict(X)
         y_dist = dist.fit(Z).predict(Z[:, 'X'])
 
-        assert_array_almost_equal(y_local, np.concatenate(y_dist.collect()))
+        assert_true(check_rdd_dtype(y_dist, (np.ndarray,)))
+        assert_array_almost_equal(y_local, y_dist.toarray())
