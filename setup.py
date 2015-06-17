@@ -5,8 +5,6 @@ import sys
 from setuptools import setup
 from setuptools import find_packages
 
-import splearn
-
 
 def is_numpy_installed():
     try:
@@ -19,7 +17,7 @@ def is_numpy_installed():
 def setup_package():
     metadata = dict(
         name='sparkit-learn',
-        version=str(splearn.__version__),
+        version="0.2.1",
         description='Scikit-learn on PySpark',
         author='Krisztian Szucs, Andras Fulop',
         author_email='krisztian.szucs@lensa.com, andras.fulop@lensa.com',
