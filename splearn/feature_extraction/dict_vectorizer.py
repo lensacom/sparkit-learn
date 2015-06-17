@@ -108,8 +108,8 @@ class SparkDictVectorizer(DictVectorizer):
         feature_names = []
 
         for x in X:
-            for f, v in x.iteritems():
-                if isinstance(v, basestring):
+            for f, v in x.items():
+                if isinstance(v, str):
                     f = "%s%s%s" % (f, self.separator, v)
                 feature_names.append(f)
 

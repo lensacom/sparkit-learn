@@ -155,7 +155,7 @@ class TestFeatureUnion(SplearnTestCase):
         svd = SparkTruncatedSVD()
         mock = TransfT()
         fu = make_sparkunion(svd, mock)
-        names, transformers = zip(*fu.transformer_list)
+        names, transformers = list(zip(*fu.transformer_list))
         assert_equal(names, ("sparktruncatedsvd", "transft"))
         assert_equal(transformers, (svd, mock))
 

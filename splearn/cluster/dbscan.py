@@ -29,5 +29,5 @@ class Dbscan(object):
 if __name__ == '__main__':
     sc = SparkContext(appName="lensaNLP test")
     model = Dbscan.train(sc.parallelize([Vectors.sparse(4, {1: 1.0, 3: 5.5})]), 25, 30)
-    print model.predict(Vectors.sparse(4, {1: 1.0, 3: 5.5}))
+    print(model.predict(Vectors.sparse(4, {1: 1.0, 3: 5.5})))
     sc.stop()

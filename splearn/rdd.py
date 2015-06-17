@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 
-import itertools
+import functools
 
 import numpy as np
 import scipy.sparse as sp
 from pyspark import RDD
+from sklearn.externals import six
 
 
 def _auto_dtype(elem):
@@ -40,7 +41,7 @@ def _pack_accumulated(accumulated, dtype):
 #         dtype(itertools.chain(*blocks))
 
 
-def _block_collection(iterator, dtype, bsize=None):
+def _block_collection(iterator, dtype, bsize=-1):
     """Pack rdd with a specific collection constructor."""
     i = 0
     accumulated = []
@@ -55,7 +56,7 @@ def _block_collection(iterator, dtype, bsize=None):
         yield _pack_accumulated(accumulated, dtype)
 
 
-def _block_tuple(iterator, dtypes, bsize=None):
+def _block_tuple(iterator, dtypes, bsize=-1):
     """Pack rdd of tuples as tuples of arrays or scipy.sparse matrices."""
     i = 0
     blocked_tuple = None
@@ -77,7 +78,7 @@ def _block_tuple(iterator, dtypes, bsize=None):
                     for x, dtype in zip(blocked_tuple, dtypes))
 
 
-def block(rdd, bsize=None, dtype=None):
+def block(rdd, bsize=-1, dtype=None):
     """Block an RDD
 
     Parameters
@@ -107,10 +108,10 @@ def block(rdd, bsize=None, dtype=None):
 
     # do different kinds of block depending on the type
     if isinstance(entry, dict):
-        rdd = rdd.map(lambda x: x.values())
-        return DictRDD(rdd, entry.keys(), bsize, dtype)
+        rdd = rdd.map(lambda x: list(x.values()))
+        return DictRDD(rdd, list(entry.keys()), bsize, dtype)
     elif isinstance(entry, tuple):
-        return DictRDD(rdd, bsize, dtype)
+        return DictRDD(rdd, bsize=bsize, dtype=dtype)
     elif sp.issparse(entry):
         return SparseRDD(rdd, bsize)
     elif isinstance(entry, np.ndarray):
@@ -216,20 +217,20 @@ class BlockRDD(object):
         indexed = self._rdd.zipWithIndex()
         if isinstance(index, slice):
             ascending = index.step is None or index.step > 0
-            rdd = indexed.filter(lambda (x, i): i in indices)
+            rdd = indexed.filter(lambda x_i: x_i[1] in indices)
             if not ascending:
-                rdd = rdd.sortBy(lambda (x, i): i, ascending)
+                rdd = rdd.sortBy(lambda x_i: x_i[1], ascending)
         elif hasattr(index, "__iter__"):
             # TODO: check monotoniticity to avoid unnunnecessary sorting
             arg = indices.tolist()
-            rdd = indexed.filter(lambda (x, i): i in indices) \
-                         .sortBy(lambda (x, i): arg.index(i))
+            rdd = indexed.filter(lambda x_i: x_i[1] in indices) \
+                         .sortBy(lambda x_i: arg.index(x_i[1]))
         elif isinstance(index, int):
-            rdd = indexed.filter(lambda (x, i): i == indices)
+            rdd = indexed.filter(lambda x_i: x_i[1] == indices)
         else:
             raise KeyError("Unexpected type of index: {0}".format(type(index)))
 
-        rdd = rdd.map(lambda (x, i): x)
+        rdd = rdd.map(lambda x_i: x_i[0])
         return self.__class__(rdd, noblock=True, **self.get_params())
 
     def __len__(self):
@@ -535,13 +536,14 @@ class DictRDD(BlockRDD):
     def __init__(self, rdd, columns=None, bsize=-1, dtype=None,
                  noblock=False):
         if hasattr(rdd, '__iter__'):
-            def zipper((a, b)):
+            def zipper(xxx_todo_changeme):
+                (a, b) = xxx_todo_changeme
                 if not isinstance(a, tuple):
                     a = (a,)
                 return a + (b,)
 
             if columns is None:
-                columns = range(len(rdd))
+                columns = list(range(len(rdd)))
             elif len(rdd) != len(columns):
                 raise ValueError("The number of RDDs must be equal to columns!")
             if all(isinstance(r, BlockRDD) for r in rdd):
@@ -553,10 +555,12 @@ class DictRDD(BlockRDD):
             elif not all(isinstance(r, RDD) for r in rdd):
                 raise TypeError("All element must be an instance of RDD or"
                                 " BlockRDD!")
-            rdd = reduce(lambda t, x: t.zip(x).map(zipper), rdd).persist()
+            rdd = functools.reduce(
+                lambda t, x: t.zip(x).map(zipper), rdd
+            ).persist()
         elif isinstance(rdd, (RDD, BlockRDD)):
             if columns is None:
-                columns = range(len(rdd.first()))
+                columns = list(range(len(rdd.first())))
         else:
             raise TypeError("Rdd Must be an instance of RDD or BlockRDD!")
 
@@ -617,7 +621,8 @@ class DictRDD(BlockRDD):
             rdd = self._rdd.map(lambda x: x[key])
             return DictRDD(rdd, bsize=self.bsize, columns=self.dtype[key],
                            dtype=self.dtype[key], noblock=True)
-        elif hasattr(key, "__iter__"):
+        elif hasattr(key, "__iter__") and not isinstance(key, six.string_types):
+            print("@dictrdd.get:", key)
             if tuple(key) == self.columns:
                 return self
             indices = [self.columns.index(k) for k in key]
@@ -662,7 +667,7 @@ class DictRDD(BlockRDD):
     def unblock(self):
         """Flattens the blocks.
         """
-        return self._rdd.flatMap(lambda cols: zip(*cols))
+        return self._rdd.flatMap(lambda cols: list(zip(*cols)))
 
     def transform(self, fn, column=None):
         """Execute a transformation on a column or columns. Returns the modified
@@ -684,7 +689,7 @@ class DictRDD(BlockRDD):
         TODO: optimize
         """
         if column is None:
-            indices = range(len(self.columns))
+            indices = list(range(len(self.columns)))
         else:
             if not hasattr(column, '__iter__'):
                 column = [column]

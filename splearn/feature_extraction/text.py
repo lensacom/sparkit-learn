@@ -286,7 +286,7 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
 
         # map analyzer and cache result
         analyze = self.build_analyzer()
-        A = Z.transform(lambda X: map(analyze, X), column='X').persist()
+        A = Z.transform(lambda X: list(map(analyze, X)), column='X').persist()
 
         # create vocabulary
         X = A[:, 'X'] if isinstance(A, DictRDD) else A
@@ -353,7 +353,7 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
         analyze = self.build_analyzer()
         mapper = self.broadcast(self._count_vocab, Z.context)
 
-        Z = Z.transform(lambda X: map(analyze, X), column='X') \
+        Z = Z.transform(lambda X: list(map(analyze, X)), column='X') \
              .transform(mapper, column='X')
 
         return Z

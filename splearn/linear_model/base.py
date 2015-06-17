@@ -3,8 +3,6 @@
 from sklearn.base import copy
 from sklearn.linear_model.base import LinearRegression
 
-from ..rdd import ArrayRDD
-
 
 class SparkLinearModelMixin(object):
 
@@ -58,6 +56,8 @@ class SparkLinearModelMixin(object):
         self.intercept_ /= other
         return self
 
+    __truediv__ = __div__
+
     def _spark_fit(self, cls, Z, *args, **kwargs):
         """Wraps a Scikit-learn Linear model's fit method to use with RDD
         input.
@@ -73,7 +73,9 @@ class SparkLinearModelMixin(object):
         -------
         self: the wrapped class
         """
-        mapper = lambda (X, y): super(cls, self).fit(X, y, *args, **kwargs)
+        mapper = lambda X_y: super(cls, self).fit(
+            X_y[0], X_y[1], *args, **kwargs
+        )
         models = Z.map(mapper)
         avg = models.sum() / models.count()
         self.__dict__.update(avg.__dict__)
