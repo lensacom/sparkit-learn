@@ -5,7 +5,7 @@ import time
 import warnings
 
 from sklearn.cross_validation import FitFailedWarning, KFold
-from sklearn.externals.joblib import Parallel, delayed, logger
+from sklearn.externals.joblib import logger
 from sklearn.utils.validation import _num_samples
 
 
@@ -40,8 +40,8 @@ def _fit_and_score(estimator, Z, scorer, train, test, verbose,
             msg = "no parameters to be set"
         else:
             msg = '%s' % (', '.join('%s=%s' % (k, v)
-                                    for k, v in parameters.items()))
-        print("[CV] %s %s" % (msg, (64 - len(msg)) * '.'))
+                                    for k, v in list(parameters.items())))
+        print(("[CV] %s %s" % (msg, (64 - len(msg)) * '.')))
 
     fit_params = fit_params if fit_params is not None else {}
 
@@ -81,7 +81,7 @@ def _fit_and_score(estimator, Z, scorer, train, test, verbose,
         msg += ", score=%f" % test_score
     if verbose > 1:
         end_msg = "%s -%s" % (msg, logger.short_format_time(scoring_time))
-        print("[CV] %s %s" % ((64 - len(end_msg)) * '.', end_msg))
+        print(("[CV] %s %s" % ((64 - len(end_msg)) * '.', end_msg)))
 
     ret = [train_score] if return_train_score else []
     ret.extend([test_score, _num_samples(Z_test), scoring_time])

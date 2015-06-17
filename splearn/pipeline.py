@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from functools import reduce
+
 import numpy as np
 import scipy.sparse as sp
 from sklearn.externals import six
@@ -234,7 +236,7 @@ class SparkFeatureUnion(FeatureUnion):
                                         self.transformer_weights, **fit_params)
             for name, trans in self.transformer_list)
 
-        Zs, transformers = zip(*result)
+        Zs, transformers = list(zip(*result))
         self._update_transformer_list(transformers)
 
         X = reduce(lambda x, y: x.zip(y._rdd), Zs)

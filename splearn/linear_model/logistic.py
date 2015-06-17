@@ -1,9 +1,11 @@
 # encoding: utf-8
 
 import numpy as np
+import scipy.sparse as sp
 from sklearn.linear_model import LogisticRegression
 
 from .base import SparkLinearModelMixin
+from ..utils.validation import check_rdd
 
 
 class SparkLogisticRegression(LogisticRegression, SparkLinearModelMixin):
@@ -117,7 +119,7 @@ class SparkLogisticRegression(LogisticRegression, SparkLinearModelMixin):
 
         Parameters
         ----------
-        Z : TupleRDD or DictRDD containing (X, y) pairs
+        Z : DictRDD containing (X, y) pairs
             X - Training vector
             y - Target labels
         classes : iterable
@@ -128,6 +130,7 @@ class SparkLogisticRegression(LogisticRegression, SparkLinearModelMixin):
         self : object
             Returns self.
         """
+        check_rdd(Z, {'X': (sp.spmatrix, np.ndarray)})
         # possible improve to partial_fit in partisions and then average
         # in final reduce
         self._classes_ = np.unique(classes)
@@ -146,4 +149,5 @@ class SparkLogisticRegression(LogisticRegression, SparkLinearModelMixin):
         C : ArrayRDD
             Predicted class label per sample.
         """
+        check_rdd(X, (sp.spmatrix, np.ndarray))
         return self._spark_predict(SparkLogisticRegression, X)

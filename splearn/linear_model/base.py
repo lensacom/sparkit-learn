@@ -1,9 +1,12 @@
 # encoding: utf-8
 
+import scipy.sparse as sp
+import numpy as np
+
 from sklearn.base import copy
 from sklearn.linear_model.base import LinearRegression
 
-from ..rdd import ArrayRDD
+from ..utils.validation import check_rdd
 
 
 class SparkLinearModelMixin(object):
@@ -58,6 +61,8 @@ class SparkLinearModelMixin(object):
         self.intercept_ /= other
         return self
 
+    __truediv__ = __div__
+
     def _spark_fit(self, cls, Z, *args, **kwargs):
         """Wraps a Scikit-learn Linear model's fit method to use with RDD
         input.
@@ -73,7 +78,9 @@ class SparkLinearModelMixin(object):
         -------
         self: the wrapped class
         """
-        mapper = lambda (X, y): super(cls, self).fit(X, y, *args, **kwargs)
+        mapper = lambda X_y: super(cls, self).fit(
+            X_y[0], X_y[1], *args, **kwargs
+        )
         models = Z.map(mapper)
         avg = models.sum() / models.count()
         self.__dict__.update(avg.__dict__)
@@ -133,7 +140,7 @@ class SparkLinearRegression(LinearRegression, SparkLinearModelMixin):
 
         Parameters
         ----------
-        Z : TupleRDD or DictRDD with (X, y) values
+        Z : DictRDD with (X, y) values
             X containing numpy array or sparse matrix - The training data
             y containing the target values
 
@@ -141,6 +148,7 @@ class SparkLinearRegression(LinearRegression, SparkLinearModelMixin):
         -------
         self : returns an instance of self.
         """
+        check_rdd(Z, {'X': (sp.spmatrix, np.ndarray)})
         return self._spark_fit(SparkLinearRegression, Z)
 
     def predict(self, X):
@@ -156,4 +164,5 @@ class SparkLinearRegression(LinearRegression, SparkLinearModelMixin):
         C : ArrayRDD
             Predicted class label per sample.
         """
+        check_rdd(X, (sp.spmatrix, np.ndarray))
         return self._spark_predict(SparkLinearRegression, X)

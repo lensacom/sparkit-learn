@@ -12,7 +12,7 @@ class SparkBroadcasterMixin(object):
                   for name in self.__transient__}
 
         def func_wrapper(*args, **kwargs):
-            for k, v in bcvars.iteritems():
+            for k, v in bcvars.items():
                 setattr(func.__self__, k, v.value)
             return func(*args, **kwargs)
         return func_wrapper

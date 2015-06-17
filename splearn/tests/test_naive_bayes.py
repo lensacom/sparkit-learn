@@ -1,7 +1,8 @@
 import numpy as np
 from sklearn.naive_bayes import GaussianNB, MultinomialNB
 from splearn.naive_bayes import SparkGaussianNB, SparkMultinomialNB
-from splearn.utils.testing import SplearnTestCase, assert_array_almost_equal
+from splearn.utils.testing import SplearnTestCase, assert_array_almost_equal, assert_true
+from splearn.utils.validation import check_rdd_dtype
 
 
 class TestGaussianNB(SplearnTestCase):
@@ -31,4 +32,5 @@ class TestMultinomialNB(SplearnTestCase):
         y_local = local.fit(X, y).predict(X)
         y_dist = dist.fit(Z, classes=np.unique(y)).predict(Z[:, 'X'])
 
-        assert_array_almost_equal(y_local, np.concatenate(y_dist.collect()))
+        assert_true(check_rdd_dtype(y_dist, (np.ndarray,)))        
+        assert_array_almost_equal(y_local, y_dist.toarray())

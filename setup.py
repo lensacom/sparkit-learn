@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
+import sys
+
 from setuptools import setup
 from setuptools import find_packages
 
 import splearn
-import sys
 
 
 def is_numpy_installed():

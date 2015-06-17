@@ -2,12 +2,14 @@ from operator import add
 
 import numpy as np
 import scipy.linalg as ln
+import scipy.sparse as sp
 # from pyspark import AccumulatorParam
 from sklearn.decomposition import TruncatedSVD
 from sklearn.utils.extmath import safe_sparse_dot
 
 from ..base import SparkBroadcasterMixin
 from ..rdd import DictRDD
+from ..utils.validation import check_rdd
 
 
 def svd(blocked_rdd, k):
@@ -292,7 +294,7 @@ class SparkTruncatedSVD(TruncatedSVD, SparkBroadcasterMixin):
             Reduced version of X. This will always be a dense array.
         """
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
-
+        check_rdd(X, (sp.spmatrix, np.ndarray))
         if self.algorithm == "em":
             X = X.persist()  # boosting iterative svm
             Sigma, V = svd_em(X, k=self.n_components, maxiter=self.n_iter,
@@ -318,9 +320,12 @@ class SparkTruncatedSVD(TruncatedSVD, SparkBroadcasterMixin):
         X_new : array, shape (n_samples, n_components)
             Reduced version of X. This will always be a dense array.
         """
-        mapper = super(SparkTruncatedSVD, self).transform
-        mapper = self.broadcast(mapper, Z.context)
-        return Z.transform(mapper, column='X')
+        X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
+        check_rdd(X, (sp.spmatrix, np.ndarray))
+
+        mapper = self.broadcast(
+            super(SparkTruncatedSVD, self).transform, Z.context)
+        return Z.transform(mapper, column='X', dtype=np.ndarray)
 
     def inverse_transform(self, Z):
         """Transform X back to its original space.
@@ -337,6 +342,9 @@ class SparkTruncatedSVD(TruncatedSVD, SparkBroadcasterMixin):
         X_original : array, shape (n_samples, n_features)
             Note that this is always a dense array.
         """
-        mapper = super(SparkTruncatedSVD, self).inverse_transform
-        mapper = self.broadcast(mapper, Z.context)
-        return Z.transform(mapper, column='X')
+        X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
+        check_rdd(X, (sp.spmatrix, np.ndarray))
+
+        mapper = self.broadcast(
+            super(SparkTruncatedSVD, self).inverse_transform, Z.context)
+        return Z.transform(mapper, column='X', dtype=np.ndarray)

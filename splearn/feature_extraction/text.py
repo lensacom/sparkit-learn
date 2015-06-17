@@ -18,6 +18,7 @@ from sklearn.utils.validation import check_is_fitted
 
 from ..base import SparkBroadcasterMixin
 from ..rdd import DictRDD
+from ..utils.validation import check_rdd
 
 
 class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
@@ -285,7 +286,7 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
 
         # map analyzer and cache result
         analyze = self.build_analyzer()
-        A = Z.transform(lambda X: map(analyze, X), column='X').persist()
+        A = Z.transform(lambda X: list(map(analyze, X)), column='X').persist()
 
         # create vocabulary
         X = A[:, 'X'] if isinstance(A, DictRDD) else A
@@ -293,7 +294,7 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
 
         # transform according to vocabulary
         mapper = self.broadcast(self._count_vocab, A.context)
-        Z = A.transform(mapper, column='X')
+        Z = A.transform(mapper, column='X', dtype=sp.spmatrix)
         Z = Z.persist()
         A.unpersist()
 
@@ -324,7 +325,7 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
             # combined mask
             mask = kept_indices[map_index]
 
-            Z = Z.transform(lambda x: x[:, mask], column='X')
+            Z = Z.transform(lambda x: x[:, mask], column='X', dtype=sp.spmatrix)
 
         return Z
 
@@ -352,8 +353,8 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
         analyze = self.build_analyzer()
         mapper = self.broadcast(self._count_vocab, Z.context)
 
-        Z = Z.transform(lambda X: map(analyze, X), column='X') \
-             .transform(mapper, column='X')
+        Z = Z.transform(lambda X: list(map(analyze, X)), column='X') \
+             .transform(mapper, column='X', dtype=sp.spmatrix)
 
         return Z
 
@@ -478,11 +479,11 @@ class SparkHashingVectorizer(HashingVectorizer):
 
         Returns
         -------
-        Z : ArrayRDD/DictRDD containg scipy.sparse matrix
+        Z : SparseRDD/DictRDD containg scipy.sparse matrix
             Document-term matrix.
         """
         mapper = super(SparkHashingVectorizer, self).transform
-        return Z.transform(mapper, column='X')
+        return Z.transform(mapper, column='X', dtype=sp.spmatrix)
 
     fit_transform = transform
 
@@ -542,7 +543,7 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
 
         Parameters
         ----------
-        Z : ArrayRDD or DictRDD containing sparse matrices
+        Z : ArrayRDD or DictRDD containing (sparse matrices|ndarray)
             a matrix of term/token counts
 
         Returns
@@ -551,6 +552,7 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
         """
 
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
+        check_rdd(X, (sp.spmatrix, np.ndarray))
 
         def mapper(X, use_idf=self.use_idf):
             if not sp.issparse(X):
@@ -585,8 +587,10 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
 
         Returns
         -------
-        Z : ArrayRDD/DictRDD containing sparse matrices
+        Z : SparseRDD/DictRDD containing sparse matrices
         """
+        X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
+        check_rdd(X, (sp.spmatrix, np.ndarray))
 
         mapper = super(SparkTfidfTransformer, self).transform
 
@@ -594,4 +598,4 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
             check_is_fitted(self, '_idf_diag', 'idf vector is not fitted')
             mapper = self.broadcast(mapper, Z.context)
 
-        return Z.transform(mapper, column='X')
+        return Z.transform(mapper, column='X', dtype=sp.spmatrix)

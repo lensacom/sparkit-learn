@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from pyspark import SparkContext
 from pyspark.mllib._common import (_get_unmangled_double_vector_rdd,
                                    _serialize_double_vector)
-from pyspark.mllib.linalg import Vectors
 
 
 class DbscanModel(object):
@@ -24,10 +22,3 @@ class Dbscan(object):
         jrdd = _get_unmangled_double_vector_rdd(rdd)._jrdd
         model = sc._jvm.PythonDbscanAPI().train(jrdd, epsilon, numOfPoints)
         return DbscanModel(model)
-
-
-if __name__ == '__main__':
-    sc = SparkContext(appName="lensaNLP test")
-    model = Dbscan.train(sc.parallelize([Vectors.sparse(4, {1: 1.0, 3: 5.5})]), 25, 30)
-    print model.predict(Vectors.sparse(4, {1: 1.0, 3: 5.5}))
-    sc.stop()

@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 
+import numpy as np
+import scipy.sparse as sp
 from sklearn.feature_extraction import DictVectorizer
 
 from ..rdd import DictRDD
-from ..base import SparkBroadcasterMixin
 from pyspark import AccumulatorParam
+from ..utils.validation import check_rdd
+from ..base import SparkBroadcasterMixin
 
 
 class SparkDictVectorizer(DictVectorizer, SparkBroadcasterMixin):
@@ -67,7 +70,7 @@ class SparkDictVectorizer(DictVectorizer, SparkBroadcasterMixin):
     [[ 0.  0.  4.]]
     """
 
-    __transient__ = ['vocabulary_', 'feature_names_']
+    __transient__ = ['feature_names_', 'vocabulary_']
 
     def fit(self, Z):
         """Learn a list of feature name -> indices mappings.
@@ -83,6 +86,7 @@ class SparkDictVectorizer(DictVectorizer, SparkBroadcasterMixin):
         self
         """
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
+        check_rdd(X, (np.ndarray,))
 
         """Create vocabulary
         """
@@ -135,9 +139,13 @@ class SparkDictVectorizer(DictVectorizer, SparkBroadcasterMixin):
         Z : transformed, containing {array, sparse matrix}
             Feature vectors; always 2-d.
         """
+        X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
+        check_rdd(X, (np.ndarray, sp.spmatrix))
+
         mapper = self.broadcast(super(SparkDictVectorizer, self).transform,
                                 Z.context)
-        return Z.transform(mapper, column='X')
+        dtype = sp.spmatrix if self.sparse else np.ndarray
+        return Z.transform(mapper, column='X', dtype=dtype)
 
     def fit_transform(self, Z):
         """Learn a list of feature name -> indices mappings and transform Z.

@@ -1,8 +1,10 @@
 # encoding: utf-8
 
 import numpy as np
+import scipy.sparse as sp
 from sklearn.svm import LinearSVC
 from splearn.linear_model.base import SparkLinearModelMixin
+from ..utils.validation import check_rdd
 
 
 class SparkLinearSVC(LinearSVC, SparkLinearModelMixin):
@@ -100,7 +102,7 @@ class SparkLinearSVC(LinearSVC, SparkLinearModelMixin):
 
         Parameters
         ----------
-        Z : TupleRDD or DictRDD containing (X, y) pairs
+        Z : DictRDD containing (X, y) pairs
             X - Training vector
             y - Target labels
         classes : iterable
@@ -111,6 +113,7 @@ class SparkLinearSVC(LinearSVC, SparkLinearModelMixin):
         self : object
             Returns self.
         """
+        check_rdd(Z, {'X': (sp.spmatrix, np.ndarray)})
         self._classes_ = np.unique(classes)
         return self._spark_fit(SparkLinearSVC, Z)
 
@@ -127,4 +130,5 @@ class SparkLinearSVC(LinearSVC, SparkLinearModelMixin):
         C : ArrayRDD
             Predicted class label per sample.
         """
+        check_rdd(X, (sp.spmatrix, np.ndarray))
         return self._spark_predict(SparkLinearSVC, X)

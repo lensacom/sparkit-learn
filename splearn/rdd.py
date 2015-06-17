@@ -1,42 +1,59 @@
 # -*- coding: utf-8 -*-
 
-import itertools
+import functools
 
 import numpy as np
 import scipy.sparse as sp
-try:
-    from pyspark.rdd import RDD
-except ImportError:
-    raise ImportError("pyspark home needs to be added to PYTHONPATH.\n"
-                      "export PYTHONPATH=$PYTHONPATH:$SPARK_HOME/python:../")
+from pyspark import RDD
+from sklearn.externals import six
 
 
-def _pack_accumulated(accumulated, dtype=None):
-    if dtype is not None:
-        return dtype(accumulated)
-    elif len(accumulated) > 0 and sp.issparse(accumulated[0]):
+def _auto_dtype(elem):
+    if sp.issparse(elem):
+        return sp.spmatrix
+    elif isinstance(elem, np.ndarray):
+        return np.ndarray
+    else:
+        return tuple
+
+
+def _check_dtype(block, dtype):
+    if not isinstance(block, dtype):
+        raise ValueError("Type mismatch. Expected {0}, {1} given.".format(
+            dtype, type(block)))
+
+
+def _pack_accumulated(accumulated, dtype):
+    if dtype is np.ndarray:
+        return np.array(accumulated)
+    elif dtype is sp.spmatrix:
         return sp.vstack(accumulated)
     else:
-        return np.array(accumulated)
+        return dtype(accumulated)
 
 
-def _unpack_blocks(blocks, dtype=None):
-    if dtype is not None:
-        dtype(itertools.chain(*blocks))
-    elif sp.issparse(blocks[0]):
-        return sp.vstack(blocks)
-    else:
-        return np.concatenate(blocks)
+def _block_collection(iterator, dtype, bsize=-1):
+    """Pack rdd with a specific collection constructor."""
+    i = 0
+    accumulated = []
+    for a in iterator:
+        if (bsize > 0) and (i >= bsize):
+            yield _pack_accumulated(accumulated, dtype)
+            accumulated = []
+            i = 0
+        accumulated.append(a)
+        i += 1
+    if i > 0:
+        yield _pack_accumulated(accumulated, dtype)
 
 
-def _block_tuple(iterator, bsize=None, dtypes=None):
+def _block_tuple(iterator, dtypes, bsize=-1):
     """Pack rdd of tuples as tuples of arrays or scipy.sparse matrices."""
     i = 0
     blocked_tuple = None
     for tuple_i in iterator:
         if blocked_tuple is None:
             blocked_tuple = tuple([] for _ in range(len(tuple_i)))
-            dtypes = dtypes or [None] * len(blocked_tuple)
 
         if (bsize > 0) and (i >= bsize):
             yield tuple(_pack_accumulated(x, dtype)
@@ -52,22 +69,7 @@ def _block_tuple(iterator, bsize=None, dtypes=None):
                     for x, dtype in zip(blocked_tuple, dtypes))
 
 
-def _block_collection(iterator, bsize=None, dtype=None):
-    """Pack rdd with a specific collection constructor."""
-    i = 0
-    accumulated = []
-    for a in iterator:
-        if (bsize > 0) and (i >= bsize):
-            yield _pack_accumulated(accumulated, dtype)
-            accumulated = []
-            i = 0
-        accumulated.append(a)
-        i += 1
-    if i > 0:
-        yield _pack_accumulated(accumulated, dtype)
-
-
-def block(rdd, bsize=None, dtype=None):
+def block(rdd, bsize=-1, dtype=None):
     """Block an RDD
 
     Parameters
@@ -97,20 +99,24 @@ def block(rdd, bsize=None, dtype=None):
 
     # do different kinds of block depending on the type
     if isinstance(entry, dict):
-        rdd = rdd.map(lambda x: x.values())
-        return DictRDD(rdd, entry.keys(), bsize, dtype)
+        rdd = rdd.map(lambda x: list(x.values()))
+        return DictRDD(rdd, list(entry.keys()), bsize, dtype)
     elif isinstance(entry, tuple):
-        return DictRDD(rdd, bsize, dtype)
-    else:  # Fallback to array packing
-        return ArrayRDD(rdd, bsize, dtype)
+        return DictRDD(rdd, bsize=bsize, dtype=dtype)
+    elif sp.issparse(entry):
+        return SparseRDD(rdd, bsize)
+    elif isinstance(entry, np.ndarray):
+        return ArrayRDD(rdd, bsize)
+    else:
+        return BlockRDD(rdd, bsize, dtype)
 
 
 class BlockRDD(object):
 
-    def __init__(self, rdd, bsize=-1, dtype=list, noblock=False):
+    def __init__(self, rdd, bsize=-1, dtype=tuple, noblock=False):
         if isinstance(rdd, BlockRDD):
+            _check_dtype(rdd.first(), dtype)
             self._rdd = rdd._rdd
-            dtype = rdd.dtype
             bsize = rdd.bsize
         elif isinstance(rdd, RDD):
             if not noblock:
@@ -139,7 +145,7 @@ class BlockRDD(object):
             Blocked rdd.
         """
         return rdd.mapPartitions(
-            lambda x: _block_collection(x, bsize, dtype))
+            lambda x: _block_collection(x, dtype, bsize))
 
     def get_params(self):
         return {'bsize': self.bsize,
@@ -201,20 +207,20 @@ class BlockRDD(object):
         indexed = self._rdd.zipWithIndex()
         if isinstance(index, slice):
             ascending = index.step is None or index.step > 0
-            rdd = indexed.filter(lambda (x, i): i in indices)
+            rdd = indexed.filter(lambda x_i: x_i[1] in indices)
             if not ascending:
-                rdd = rdd.sortBy(lambda (x, i): i, ascending)
+                rdd = rdd.sortBy(lambda x_i: x_i[1], ascending)
         elif hasattr(index, "__iter__"):
             # TODO: check monotoniticity to avoid unnunnecessary sorting
             arg = indices.tolist()
-            rdd = indexed.filter(lambda (x, i): i in indices) \
-                         .sortBy(lambda (x, i): arg.index(i))
+            rdd = indexed.filter(lambda x_i: x_i[1] in indices) \
+                         .sortBy(lambda x_i: arg.index(x_i[1]))
         elif isinstance(index, int):
-            rdd = indexed.filter(lambda (x, i): i == indices)
+            rdd = indexed.filter(lambda x_i: x_i[1] == indices)
         else:
             raise KeyError("Unexpected type of index: {0}".format(type(index)))
 
-        rdd = rdd.map(lambda (x, i): x)
+        rdd = rdd.map(lambda x_i: x_i[0])
         return self.__class__(rdd, noblock=True, **self.get_params())
 
     def __len__(self):
@@ -248,15 +254,94 @@ class BlockRDD(object):
         rdd = self._rdd.map(lambda x: np.array(x))
         return np.concatenate(rdd.collect())
 
-    def transform(self, f, *args, **kwargs):
+    def transform(self, fn, dtype=None, *args, **kwargs):
         """Equivalent to map, compatibility purpose only.
         Column parameter ignored.
         """
-        rdd = self._rdd.map(f)
-        return self.__class__(rdd, noblock=True, **self.get_params())
+        rdd = self._rdd.map(fn)
+
+        if dtype is None:
+            return self.__class__(rdd, noblock=True, **self.get_params())
+        if dtype is np.ndarray:
+            return ArrayRDD(rdd, bsize=self.bsize, noblock=True)
+        elif dtype is sp.spmatrix:
+            return SparseRDD(rdd, bsize=self.bsize, noblock=True)
+        else:
+            return BlockRDD(rdd, bsize=self.bsize, dtype=dtype, noblock=True)
+
+    # def cartesian(self, other):
+    #     return TupleRDD(self._rdd.cartesian(other._rdd), False)
 
 
-class ArrayRDD(BlockRDD):
+class ArrayLikeRDDMixin(object):
+
+    def __getitem__(self, key):
+        """Access a specified block.
+
+        Parameters
+        ----------
+        key : int or slice
+            The key of the block or the range of the blocks.
+
+        Returns
+        -------
+        block : ArrayRDD
+            The selected block(s).
+        """
+        if isinstance(key, tuple):
+            index, mask = key[0], key[1:]
+            return super(ArrayRDD, self).__getitem__(index) \
+                                        .map(lambda x: x[mask])
+        else:
+            return super(ArrayRDD, self).__getitem__(key)
+
+    @property
+    def ndim(self):
+        return self._rdd.first().ndim
+
+    @property
+    def shape(self):
+        """Returns the shape of the data."""
+        # TODO cache
+        first = self.first().shape
+        shape = self._rdd.map(lambda x: x.shape[0]).sum()
+        return (shape,) + first[1:]
+
+    @property
+    def size(self):
+        """Returns the shape of the data.
+        """
+        return np.prod(self.shape)
+
+    def sum(self, axis=None):
+        if axis in (None, 0):
+            return self._rdd.map(lambda x: x.sum(axis=axis)).sum()
+        else:
+            return self._rdd.map(lambda x: x.sum(axis=axis)) \
+                            .reduce(lambda a, b: np.concatenate([a, b]))
+
+    def mean(self, axis=None):
+        def mapper(x):
+            """Calculate statistics for every numpy or scipy blocks."""
+            cnt = np.prod(x.shape) if axis is None else x.shape[axis]
+            return cnt, x.mean(axis=axis)
+
+        def reducer(a, b):
+            """Calculate the combined statistics."""
+            n_a, mean_a = a
+            n_b, mean_b = b
+            n_ab = n_a + n_b
+            if axis in (None, 0):
+                mean_ab = ((mean_a * n_a) + (mean_b * n_b)) / n_ab
+            else:
+                mean_ab = np.concatenate([mean_a, mean_b])
+            return n_ab, mean_ab
+
+        n, mean = self._rdd.map(mapper).treeReduce(reducer)
+        return mean
+
+
+class ArrayRDD(BlockRDD, ArrayLikeRDDMixin):
 
     """A distributed array data structure.
 
@@ -303,88 +388,83 @@ class ArrayRDD(BlockRDD):
 
     """
 
-    def __init__(self, rdd, bsize=-1, dtype=None, noblock=False):
-        # TODO: accept list of RDDs then zip them
-        super(ArrayRDD, self).__init__(rdd, bsize, None, noblock)
+    def __init__(self, rdd, bsize=-1, dtype=np.ndarray, noblock=False):
+        if dtype is not np.ndarray:
+            raise ValueError("Only supported type for ArrayRDD is np.ndarray!")
+        super(ArrayRDD, self).__init__(rdd, bsize, dtype, noblock)
 
-    def __getitem__(self, key):
-        """Access a specified block.
+    def _on_axis(self, func, axis=None):
+        rdd = self._rdd.map(lambda x: getattr(x, func)(axis=axis))
 
-        Parameters
-        ----------
-        key : int or slice
-            The key of the block or the range of the blocks.
-
-        Returns
-        -------
-        block : ArrayRDD
-            The selected block(s).
-        """
-        if isinstance(key, tuple):
-            index, mask = key[0], key[1:]
-            return super(ArrayRDD, self).__getitem__(index) \
-                                        .map(lambda x: x[mask])
+        if axis is None:
+            return getattr(np.array(rdd.collect()), func)()
+        elif axis == 0:
+            return rdd.reduce(
+                lambda a, b: getattr(np.array((a, b)), func)(axis=0))
         else:
-            return super(ArrayRDD, self).__getitem__(key)
+            return rdd.reduce(lambda a, b: np.concatenate((a, b)))
 
-    @property
-    def ndim(self):
-        return self._rdd.first().ndim
-
-    @property
-    def shape(self):
-        """Returns the shape of the data."""
-        # TODO cache
-        first = self.first().shape
-        shape = self._rdd.map(lambda x: x.shape[0]).sum()
-        return (shape,) + first[1:]
-
-    @property
-    def size(self):
-        """Returns the shape of the data.
-        """
-        return np.prod(self.shape)
-
-    def toarray(self):
-        """Returns the data as numpy.array from each partition."""
-        return np.concatenate(self.collect())
-
-    def sum(self, axis=None):
-        if axis in (None, 0):
-            return self._rdd.map(lambda x: x.sum(axis=axis)).sum()
-        else:
-            return self._rdd.map(lambda x: x.sum(axis=axis)) \
-                            .reduce(lambda a, b: _unpack_blocks([a, b]))
+    def tosparse(self):
+        return SparseRDD(self._rdd.map(lambda x: sp.csr_matrix(x)))
 
     def dot(self, other):
         # TODO naive dot implementation with another ArrayRDD
-        return self.map(lambda x: x.dot(other))
+        rdd = self._rdd.map(lambda x: x.dot(other))
+        return ArrayRDD(rdd, bsize=self.bsize, noblock=True)
 
-    def mean(self, axis=None):
-        def mapper(x):
-            """Calculate statistics for every numpy or scipy blocks."""
-            cnt = np.prod(x.shape) if axis is None else x.shape[axis]
-            return cnt, x.mean(axis=axis)
+    def flatten(self):
+        return self.map(lambda x: x.flatten())
 
-        def reducer(a, b):
-            """Calculate the combined statistics."""
-            n_a, mean_a = a
-            n_b, mean_b = b
-            n_ab = n_a + n_b
-            if axis in (None, 0):
-                mean_ab = ((mean_a * n_a) + (mean_b * n_b)) / n_ab
-            else:
-                mean_ab = _unpack_blocks([mean_a, mean_b])
-            return n_ab, mean_ab
+    def min(self, axis=None):
+        return self._on_axis('min', axis)
 
-        n, mean = self._rdd.map(mapper).treeReduce(reducer)
-        return mean
+    def max(self, axis=None):
+        return self._on_axis('max', axis)
 
-    # def tosparse(self):
-    #     return sp.vstack(self.collect())
+    def prod(self, axis=None):
+        return self._on_axis('prod', axis)
 
-    # def cartesian(self, other):
-    #     return TupleRDD(self._rdd.cartesian(other._rdd), False)
+
+class SparseRDD(BlockRDD, ArrayLikeRDDMixin):
+
+    def __init__(self, rdd, bsize=-1, dtype=sp.spmatrix, noblock=False):
+        if dtype is not sp.spmatrix:
+            raise ValueError("Only supported type for SparseRDD is"
+                             " sp.spmatrix!")
+        super(SparseRDD, self).__init__(rdd, bsize, dtype, noblock)
+
+    def _on_axis(self, func, axis=None):
+        rdd = self._rdd.map(lambda x: getattr(x, func)(axis=axis))
+
+        if axis is None:
+            return getattr(np.array(rdd.collect()), func)()
+        elif axis == 0:
+            return rdd.reduce(
+                lambda a, b: getattr(sp.vstack((a, b)), func)(axis=0))
+        else:
+            return rdd.reduce(lambda a, b: sp.vstack((a, b)))
+
+    def toarray(self):
+        """Returns the data as numpy.array from each partition."""
+        rdd = self._rdd.map(lambda x: x.toarray())
+        return np.concatenate(rdd.collect())
+
+    def todense(self):
+        rdd = self._rdd.map(lambda x: x.toarray())
+        return ArrayRDD(rdd, noblock=True)
+
+    def dot(self, other):
+        rdd = self._rdd.map(lambda x: x.dot(other))
+        if sp.issparse(other):
+            return SparseRDD(rdd, bsize=self.bsize, noblock=True)
+        else:
+            return ArrayRDD(rdd, bsize=self.bsize, noblock=True)
+
+    def min(self, axis=None):
+        return self._on_axis('min', axis)
+
+    def max(self, axis=None):
+        return self._on_axis('max', axis)
 
 
 class DictRDD(BlockRDD):
@@ -448,13 +528,14 @@ class DictRDD(BlockRDD):
     def __init__(self, rdd, columns=None, bsize=-1, dtype=None,
                  noblock=False):
         if hasattr(rdd, '__iter__'):
-            def zipper((a, b)):
+            def zipper(a_b):
+                (a, b) = a_b
                 if not isinstance(a, tuple):
                     a = (a,)
                 return a + (b,)
 
             if columns is None:
-                columns = range(len(rdd))
+                columns = list(range(len(rdd)))
             elif len(rdd) != len(columns):
                 raise ValueError("The number of RDDs must be equal to columns!")
             if all(isinstance(r, BlockRDD) for r in rdd):
@@ -466,10 +547,11 @@ class DictRDD(BlockRDD):
             elif not all(isinstance(r, RDD) for r in rdd):
                 raise TypeError("All element must be an instance of RDD or"
                                 " BlockRDD!")
-            rdd = reduce(lambda t, x: t.zip(x).map(zipper), rdd).persist()
+            rdd = functools.reduce(lambda t, x: t.zip(x).map(zipper), rdd) \
+                           .persist()
         elif isinstance(rdd, (RDD, BlockRDD)):
             if columns is None:
-                columns = range(len(rdd.first()))
+                columns = list(range(len(rdd.first())))
         else:
             raise TypeError("Rdd Must be an instance of RDD or BlockRDD!")
 
@@ -479,7 +561,7 @@ class DictRDD(BlockRDD):
             raise ValueError("Columns parameter must be iterable!")
 
         if dtype is None:
-            dtype = [None] * len(columns)
+            dtype = [_auto_dtype(elem) for elem in rdd.first()]
         elif len(columns) != len(dtype):
             raise ValueError("Columns and dtype lengths must be equal!")
 
@@ -501,7 +583,7 @@ class DictRDD(BlockRDD):
         rdd : pyspark.rdd.RDD
             Blocked rdd.
         """
-        return rdd.mapPartitions(lambda x: _block_tuple(x, bsize, dtype))
+        return rdd.mapPartitions(lambda x: _block_tuple(x, dtype, bsize))
 
     def get_params(self):
         return {'bsize': self.bsize,
@@ -530,7 +612,8 @@ class DictRDD(BlockRDD):
             rdd = self._rdd.map(lambda x: x[key])
             return DictRDD(rdd, bsize=self.bsize, columns=self.dtype[key],
                            dtype=self.dtype[key], noblock=True)
-        elif hasattr(key, "__iter__"):
+        elif hasattr(key, "__iter__") and not isinstance(key, six.string_types):
+            print("@dictrdd.get:", key)
             if tuple(key) == self.columns:
                 return self
             indices = [self.columns.index(k) for k in key]
@@ -540,12 +623,15 @@ class DictRDD(BlockRDD):
                            noblock=True)
         else:
             index = self.columns.index(key)
+            dtype = self.dtype[index]
+            bsize = self.bsize
             rdd = self._rdd.map(lambda x: x[index])
-            if self.dtype[index] is None:
-                return ArrayRDD(rdd, bsize=self.bsize, noblock=True)
+            if dtype is np.ndarray:
+                return ArrayRDD(rdd, bsize=bsize, noblock=True)
+            elif dtype is sp.spmatrix:
+                return SparseRDD(rdd, bsize=bsize, noblock=True)
             else:
-                return BlockRDD(rdd, bsize=self.bsize, dtype=self.dtype[index],
-                                noblock=True)
+                return BlockRDD(rdd, bsize=bsize, dtype=dtype, noblock=True)
 
     def __getitem__(self, key):
         """Access a specified block.
@@ -572,9 +658,9 @@ class DictRDD(BlockRDD):
     def unblock(self):
         """Flattens the blocks.
         """
-        return self._rdd.flatMap(lambda cols: zip(*cols))
+        return self._rdd.flatMap(lambda cols: list(zip(*cols)))
 
-    def transform(self, fn, column=None):
+    def transform(self, fn, column=None, dtype=None):
         """Execute a transformation on a column or columns. Returns the modified
         DictRDD.
 
@@ -585,6 +671,8 @@ class DictRDD(BlockRDD):
         column : {str, list or None}
             The column(s) to transform. If None is specified the method is
             equivalent to map.
+        column : {str, list or None}
+            The dtype of the column(s) to transform.
 
         Returns
         -------
@@ -593,12 +681,23 @@ class DictRDD(BlockRDD):
 
         TODO: optimize
         """
+        dtypes = self.dtype
         if column is None:
-            indices = range(len(self.columns))
+            indices = list(range(len(self.columns)))
         else:
-            if not hasattr(column, '__iter__'):
+            # TODO: find a better way
+            #if not hasattr(column, '__iter__'):
+            if not type(column) in (list, tuple):
                 column = [column]
             indices = [self.columns.index(c) for c in column]
+
+        if dtype is not None:
+            # TODO: find a better way!
+            #if not hasattr(dtype, '__iter__'):
+            if not type(dtype) in (list, tuple):
+                dtype = [dtype]
+            dtypes = [dtype[i] if i in indices else t
+                      for i, t in enumerate(self.dtype)]
 
         def mapper(values):
             result = fn(*[values[i] for i in indices])
@@ -615,5 +714,6 @@ class DictRDD(BlockRDD):
             return tuple(result[indices.index(i)] if i in indices else v
                          for i, v in enumerate(values))
 
-        return self.__class__(self._rdd.map(mapper), noblock=True,
-                              **self.get_params())
+        return DictRDD(self._rdd.map(mapper),
+                       columns=self.columns, dtype=dtypes,
+                       bsize=self.bsize, noblock=True)

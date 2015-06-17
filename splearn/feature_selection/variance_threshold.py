@@ -1,10 +1,12 @@
 import numpy as np
+import scipy.sparse as sp
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.utils import check_array
 from sklearn.utils.sparsefuncs import mean_variance_axis
 
 from ..rdd import DictRDD
 from .base import SparkSelectorMixin
+from ..utils.validation import check_rdd
 
 
 class SparkVarianceThreshold(VarianceThreshold, SparkSelectorMixin):
@@ -57,7 +59,9 @@ class SparkVarianceThreshold(VarianceThreshold, SparkSelectorMixin):
         -------
         self
         """
+
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
+        check_rdd(X, (np.ndarray, sp.spmatrix))
 
         def mapper(X):
             """Calculate statistics for every numpy or scipy blocks."""
@@ -101,6 +105,9 @@ class SparkVarianceThreshold(VarianceThreshold, SparkSelectorMixin):
         X_r : array of shape [n_samples, n_selected_features]
             The input samples with only the selected features.
         """
-        mapper = super(SparkVarianceThreshold, self).transform
-        mapper = self.broadcast(mapper, Z.context)
+        X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
+        check_rdd(X, (np.ndarray, sp.spmatrix))
+
+        mapper = self.broadcast(
+            super(SparkVarianceThreshold, self).transform, Z.context)
         return Z.transform(mapper, column='X')

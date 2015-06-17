@@ -4,7 +4,8 @@ from sklearn.decomposition import TruncatedSVD
 from splearn.decomposition import SparkTruncatedSVD
 from splearn.decomposition.truncated_svd import svd, svd_em
 from splearn.utils.testing import (SplearnTestCase, assert_array_almost_equal,
-                                   assert_array_equal)
+                                   assert_array_equal, assert_true)
+from splearn.utils.validation import check_rdd_dtype
 
 
 def match_sign(a, b):
@@ -89,9 +90,11 @@ class TestTruncatedSVD(SplearnTestCase):
                                  random_state=random_state)
 
         Z_local = local.fit_transform(X)
-        Z_dist = dist.fit_transform(X_rdd).toarray()
+        Z_dist = dist.fit_transform(X_rdd)
+        Z_collected = Z_dist.toarray()
+        assert_true(check_rdd_dtype(Z_dist, (np.ndarray,)))
 
         tol = 1e-1
-        assert_array_equal(Z_local.shape, Z_dist.shape)
-        assert(np.allclose(+Z_dist[:, 0], Z_local[:, 0], atol=tol) |
-               np.allclose(-Z_dist[:, 0], Z_local[:, 0], atol=tol))
+        assert_array_equal(Z_local.shape, Z_collected.shape)
+        assert(np.allclose(+Z_collected[:, 0], Z_local[:, 0], atol=tol) |
+               np.allclose(-Z_collected[:, 0], Z_local[:, 0], atol=tol))

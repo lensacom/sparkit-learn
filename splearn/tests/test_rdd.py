@@ -1,21 +1,13 @@
 import numpy as np
 import scipy.sparse as sp
 from pyspark import RDD
-from splearn.rdd import ArrayRDD, BlockRDD, DictRDD, block
+from splearn.rdd import ArrayRDD, SparseRDD, BlockRDD, DictRDD, block
 from splearn.utils.testing import (SplearnTestCase, assert_almost_equal,
                                    assert_array_almost_equal,
                                    assert_array_equal, assert_equal,
                                    assert_is_instance,
                                    assert_multiple_tuples_equal, assert_raises,
                                    assert_true, assert_tuple_equal)
-
-
-def unpack(rdd):
-    blocks = rdd.collect()
-    if sp.issparse(blocks[0]):
-        return sp.vstack(blocks)
-    else:
-        return np.concatenate(blocks)
 
 
 class TestBlocking(SplearnTestCase):
@@ -41,7 +33,7 @@ class TestBlocking(SplearnTestCase):
         data = self.sc.parallelize([1 for i in range(n_samples)],
                                    n_partitions)
         blocked_data = block(data, dtype=tuple)
-        assert_array_equal(tuple([1] * (n_samples / n_partitions)),
+        assert_array_equal(tuple([1] * (n_samples // n_partitions)),
                            blocked_data.first())
         blocks = blocked_data.collect()
         assert_equal(len(blocks), n_partitions)
@@ -63,7 +55,7 @@ class TestBlocking(SplearnTestCase):
         data = self.sc.parallelize([np.array([1]) for i in range(n_samples)],
                                    n_partitions)
         blocked_data = block(data)
-        assert_array_equal(np.ones((n_samples / n_partitions, 1)),
+        assert_array_equal(np.ones((n_samples // n_partitions, 1)),
                            blocked_data.first())
         blocks = blocked_data.collect()
         assert_equal(len(blocks), n_partitions)
@@ -137,20 +129,24 @@ class TestBlocking(SplearnTestCase):
 class TestBlockRDD(SplearnTestCase):
 
     def generate(self, n_samples=100, n_partitions=10):
-        return self.sc.parallelize(range(n_samples), n_partitions)
+        return self.sc.parallelize(list(range(n_samples)), n_partitions)
 
     def test_creation(self):
         rdd = self.generate()
 
         blocked = BlockRDD(rdd)
         assert_is_instance(blocked, BlockRDD)
-        assert_equal(blocked.first(), range(10))
-        assert_equal(blocked.collect(), np.arange(100).reshape(10, 10).tolist())
+        expected = tuple(range(10))
+        assert_equal(blocked.first(), expected)
+        expected = [tuple(v) for v in np.arange(100).reshape(10, 10)]
+        assert_equal(blocked.collect(), expected)
 
         blocked = BlockRDD(rdd, bsize=4)
         assert_is_instance(blocked, BlockRDD)
-        assert_equal(blocked.first(), range(4))
-        assert_equal([len(x) for x in blocked.collect()], [4, 4, 2] * 10)
+        expected = tuple(range(4))
+        assert_equal(blocked.first(), expected)
+        expected = [4, 4, 2] * 10
+        assert_equal([len(x) for x in blocked.collect()], expected)
 
     def test_dtypes(self):
         rdd = self.generate()
@@ -199,28 +195,28 @@ class TestBlockRDD(SplearnTestCase):
         blocked = BlockRDD(self.generate(1000, 5))
         unblocked = blocked.unblock()
         assert_is_instance(blocked, BlockRDD)
-        assert_equal(unblocked.collect(), range(1000))
+        assert_equal(unblocked.collect(), list(range(1000)))
 
         blocked = BlockRDD(self.generate(1000, 5), dtype=tuple)
         unblocked = blocked.unblock()
         assert_is_instance(blocked, BlockRDD)
-        assert_equal(unblocked.collect(), range(1000))
+        assert_equal(unblocked.collect(), list(range(1000)))
 
     def test_tolist(self):
         blocked = BlockRDD(self.generate(1000, 5))
         unblocked = blocked.tolist()
         assert_is_instance(blocked, BlockRDD)
-        assert_equal(unblocked, range(1000))
+        assert_equal(unblocked, list(range(1000)))
 
         blocked = BlockRDD(self.generate(1000, 5), dtype=tuple)
         unblocked = blocked.tolist()
         assert_is_instance(blocked, BlockRDD)
-        assert_equal(unblocked, range(1000))
+        assert_equal(unblocked, list(range(1000)))
 
         blocked = BlockRDD(self.generate(1000, 5), dtype=np.array)
         unblocked = blocked.tolist()
         assert_is_instance(blocked, BlockRDD)
-        assert_equal(unblocked, range(1000))
+        assert_equal(unblocked, list(range(1000)))
 
 
 class TestArrayRDD(SplearnTestCase):
@@ -379,9 +375,7 @@ class TestArrayRDD(SplearnTestCase):
         assert_array_equal(X[-3].first(), expected)
 
     def test_get_multiple_item(self):
-        data = np.arange(400).reshape((100, 4))
-        rdd = self.sc.parallelize(data, 4)
-        X = ArrayRDD(rdd, 5)
+        X, X_rdd = self.make_dense_range_rdd((100, 4), block_size=5)
 
         exp0th = np.arange(0, 20).reshape((5, 4))
         exp1st = np.arange(20, 40).reshape((5, 4))
@@ -390,19 +384,17 @@ class TestArrayRDD(SplearnTestCase):
         exp18th = np.arange(360, 380).reshape((5, 4))
         exp19th = np.arange(380, 400).reshape((5, 4))
 
-        assert_array_equal(X[[0, 1]].collect(), [exp0th, exp1st])
-        assert_array_equal(X[[0, 2]].collect(), [exp0th, exp2nd])
-        assert_array_equal(X[[0, -1]].collect(), [exp0th, exp19th])
-        assert_array_equal(X[[0, -2]].collect(), [exp0th, exp18th])
-        assert_array_equal(X[[1, -2]].collect(), [exp1st, exp18th])
-        assert_array_equal(X[[7, 0]].collect(), [exp7th, exp0th])
-        assert_array_equal(X[[1, 2, 7, 19]].collect(),
+        assert_array_equal(X_rdd[[0, 1]].collect(), [exp0th, exp1st])
+        assert_array_equal(X_rdd[[0, 2]].collect(), [exp0th, exp2nd])
+        assert_array_equal(X_rdd[[0, -1]].collect(), [exp0th, exp19th])
+        assert_array_equal(X_rdd[[0, -2]].collect(), [exp0th, exp18th])
+        assert_array_equal(X_rdd[[1, -2]].collect(), [exp1st, exp18th])
+        assert_array_equal(X_rdd[[7, 0]].collect(), [exp7th, exp0th])
+        assert_array_equal(X_rdd[[1, 2, 7, 19]].collect(),
                            [exp1st, exp2nd, exp7th, exp19th])
 
     def test_array_slice_syntax(self):
-        data = np.arange(400).reshape((100, 4))
-        rdd = self.sc.parallelize(data, 4)
-        X = ArrayRDD(rdd, 5)
+        X, X_rdd = self.make_dense_range_rdd((100, 4), block_size=5)
 
         exp0th = np.arange(0, 20).reshape((5, 4))
         exp1st = np.arange(20, 40).reshape((5, 4))
@@ -412,78 +404,112 @@ class TestArrayRDD(SplearnTestCase):
         exp18th = np.arange(360, 380).reshape((5, 4))
         exp19th = np.arange(380, 400).reshape((5, 4))
 
-        assert_array_equal(X[:1].collect(), [exp0th])
-        assert_array_equal(X[:2].collect(), [exp0th, exp1st])
-        assert_array_equal(X[18:].collect(), [exp18th, exp19th])
-        assert_array_equal(X[-1:].collect(), [exp19th])
-        assert_array_equal(X[-2:].collect(), [exp18th, exp19th])
-        assert_array_equal(X[7:10].collect(), [exp7th, exp8th, exp9th])
-        assert_array_equal(X[7:10:2].collect(), [exp7th, exp9th])
-        assert_array_equal(X[::9].collect(), [exp0th, exp9th, exp18th])
-        assert_array_equal(X[::-10].collect(), [exp19th, exp9th])
-        assert_array_equal(X[-1:1].collect(), [])
+        assert_array_equal(X_rdd[:1].collect(), [exp0th])
+        assert_array_equal(X_rdd[:2].collect(), [exp0th, exp1st])
+        assert_array_equal(X_rdd[18:].collect(), [exp18th, exp19th])
+        assert_array_equal(X_rdd[-1:].collect(), [exp19th])
+        assert_array_equal(X_rdd[-2:].collect(), [exp18th, exp19th])
+        assert_array_equal(X_rdd[7:10].collect(), [exp7th, exp8th, exp9th])
+        assert_array_equal(X_rdd[7:10:2].collect(), [exp7th, exp9th])
+        assert_array_equal(X_rdd[::9].collect(), [exp0th, exp9th, exp18th])
+        assert_array_equal(X_rdd[::-10].collect(), [exp19th, exp9th])
+        assert_array_equal(X_rdd[-1:1].collect(), [])
 
     def test_transform(self):
-        data = np.arange(400).reshape((100, 4))
-        rdd = self.sc.parallelize(data, 4)
-        X = ArrayRDD(rdd, 5)
+        X, X_rdd = self.make_dense_rdd((100, 4))
 
         fn = lambda x: x ** 2
-        X1 = map(fn, X.collect())
-        X2 = X.transform(fn).collect()
+        X1 = list(map(fn, X_rdd.collect()))
+        X2 = X_rdd.transform(fn).collect()
 
         assert_array_equal(X1, X2)
 
+    def test_transform_dtype(self):
+        X, X_rdd = self.make_dense_rdd((100, 4))
+
+        rdd = X_rdd.transform(lambda x: x)
+        assert_is_instance(rdd, ArrayRDD)
+        rdd = X_rdd.transform(lambda x: x.tolist(), dtype=list)
+        assert_is_instance(rdd, BlockRDD)
+        rdd = X_rdd.transform(lambda x: sp.lil_matrix(x), dtype=sp.spmatrix)
+        assert_is_instance(rdd, SparseRDD)
+
+
+class TestDenseMath(SplearnTestCase):
+
+    def _test_func_on_axis(self, func):
+        X, X_rdd = self.make_dense_rdd(block_size=100)
+        assert_almost_equal(getattr(X_rdd, func)(), getattr(X, func)())
+        for axes in (0, 1):
+            assert_array_almost_equal(getattr(X_rdd, func)(axis=axes),
+                                      getattr(X, func)(axis=axes))
+
+        X, X_rdd = self.make_dense_rdd((100, 3, 2))
+        assert_almost_equal(getattr(X_rdd, func)(), getattr(X, func)())
+        for axes in (0, 1, 2):
+            assert_array_almost_equal(getattr(X_rdd, func)(axis=axes),
+                                      getattr(X, func)(axis=axes))
+
+    def test_min(self):
+        self._test_func_on_axis('min')
+
+    def test_max(self):
+        self._test_func_on_axis('max')
+
     def test_sum(self):
-        data = np.arange(400).reshape((100, 4))
-        rdd = self.sc.parallelize(data)
-        assert_equal(ArrayRDD(rdd).sum(), data.sum())
-        assert_array_equal(ArrayRDD(rdd).sum(axis=0), data.sum(axis=0))
-        assert_array_equal(ArrayRDD(rdd).sum(axis=1), data.sum(axis=1))
+        self._test_func_on_axis('sum')
 
-        data = np.arange(600).reshape((100, 3, 2))
-        rdd = self.sc.parallelize(data)
-        assert_equal(ArrayRDD(rdd).sum(), data.sum())
-        assert_array_equal(ArrayRDD(rdd).sum(axis=0), data.sum(axis=0))
-        assert_array_equal(ArrayRDD(rdd).sum(axis=1), data.sum(axis=1))
-        assert_array_equal(ArrayRDD(rdd).sum(axis=2), data.sum(axis=2))
-
-    def test_sum_sparse(self):
-        data, rdd = self.generate_sparse_dataset()
-        assert_almost_equal(ArrayRDD(rdd).sum(), data.sum())
-        assert_array_almost_equal(ArrayRDD(rdd).sum(axis=0), data.sum(axis=0))
-        assert_array_almost_equal(ArrayRDD(rdd).sum(axis=1), data.sum(axis=1))
-
-    def generate_sparse_dataset(self, shape=(1e3, 10), bsize=None):
-        data = sp.rand(shape[0], shape[1], random_state=2, density=0.1)
-        X = [sp.csr_matrix([row]) for row in data.toarray()]
-        X_rdd = ArrayRDD(self.sc.parallelize(X, 4), bsize)
-        return data, X_rdd
-
-    def test_dot(self):
-        a = np.arange(200).reshape(20, 10)
-        b = np.arange(200).reshape(10, 20)
-        a_rdd = ArrayRDD(self.sc.parallelize(a))
-        assert_array_almost_equal(unpack(a_rdd.dot(b)), a.dot(b))
-
-    def test_dot_sparse(self):
-        a, a_rdd = self.generate_sparse_dataset(shape=(10, 20))
-        b = sp.rand(20, 10, random_state=2, density=0.1)
-        assert_array_almost_equal(unpack(a_rdd.dot(b)).toarray(),
-                                  a.dot(b).toarray())
+    def test_prod(self):
+        self._test_func_on_axis('prod')
 
     def test_mean(self):
-        data = np.arange(600).reshape((100, 3, 2))
-        rdd = self.sc.parallelize(data)
-        assert_equal(ArrayRDD(rdd).mean(), data.mean())
-        assert_array_equal(ArrayRDD(rdd).mean(axis=0), data.mean(axis=0))
-        assert_array_equal(ArrayRDD(rdd).mean(axis=1), data.mean(axis=1))
+        self._test_func_on_axis('mean')
 
-    def test_mean_sparse(self):
-        data, rdd = self.generate_sparse_dataset()
-        assert_almost_equal(ArrayRDD(rdd).mean(), data.mean())
-        assert_array_almost_equal(ArrayRDD(rdd).mean(axis=0), data.mean(axis=0))
-        assert_array_almost_equal(ArrayRDD(rdd).mean(axis=1), data.mean(axis=1))
+    def test_dot(self):
+        A, A_rdd = self.make_dense_rdd((20, 10))
+        B, B_rdd = self.make_dense_rdd((10, 20))
+        assert_array_almost_equal(A_rdd.dot(B).toarray(), A.dot(B))
+        assert_array_almost_equal(B_rdd.dot(A).toarray(), B.dot(A))
+
+    def test_flatten(self):
+        X, X_rdd = self.make_dense_rdd((100, 3, 2))
+        X = X.flatten()
+        X_rdd = X_rdd.flatten()
+        assert_array_equal(X_rdd.toarray(), X)
+
+
+class TestSparseMath(SplearnTestCase):
+
+    def _test_func_on_axis(self, func, toarray=True):
+        X, X_rdd = self.make_sparse_rdd(block_size=100)
+        assert_almost_equal(getattr(X_rdd, func)(), getattr(X, func)())
+        for axes in (0, 1):
+            if toarray:
+                assert_array_almost_equal(
+                    getattr(X_rdd, func)(axis=axes).toarray(),
+                    getattr(X, func)(axis=axes).toarray())
+            else:
+                assert_array_almost_equal(
+                    getattr(X_rdd, func)(axis=axes),
+                    getattr(X, func)(axis=axes))
+
+    def test_min(self):
+        self._test_func_on_axis('min')
+
+    def test_max(self):
+        self._test_func_on_axis('max')
+
+    def test_sum(self):
+        self._test_func_on_axis('sum', toarray=False)
+
+    def test_mean(self):
+        self._test_func_on_axis('mean', toarray=False)
+
+    def test_dot(self):
+        A, A_rdd = self.make_sparse_rdd((20, 10))
+        B, B_rdd = self.make_sparse_rdd((10, 20))
+        assert_array_almost_equal(A_rdd.dot(B).toarray(), A.dot(B).toarray())
+        assert_array_almost_equal(B_rdd.dot(A).toarray(), B.dot(A).toarray())
 
 
 class TestDictRDD(SplearnTestCase):
@@ -507,28 +533,39 @@ class TestDictRDD(SplearnTestCase):
         assert_is_instance(DictRDD(rdd), BlockRDD)
 
     def test_creation_from_rdds(self):
-        x, y, z = np.arange(80).reshape((40, 2)), np.arange(40), range(40)
+        x = np.arange(80).reshape((40, 2))
+        y = np.arange(40)
+        z = list(range(40))
         x_rdd = self.sc.parallelize(x, 4)
         y_rdd = self.sc.parallelize(y, 4)
         z_rdd = self.sc.parallelize(z, 4)
 
-        expected = (np.arange(20).reshape(10, 2), np.arange(10), range(10))
+        expected = (
+            np.arange(20).reshape(10, 2),
+            np.arange(10), list(range(10))
+        )
         rdd = DictRDD([x_rdd, y_rdd, z_rdd])
         assert_tuple_equal(rdd.first(), expected)
         rdd = DictRDD([x_rdd, y_rdd, z_rdd], columns=('x', 'y', 'z'))
         assert_tuple_equal(rdd.first(), expected)
-        rdd = DictRDD([x_rdd, y_rdd, z_rdd], dtype=(None, None, list))
+        rdd = DictRDD([x_rdd, y_rdd, z_rdd],
+                      dtype=(np.ndarray, np.ndarray, list))
         first = rdd.first()
         assert_tuple_equal(first, expected)
         assert_is_instance(first[2], list)
 
     def test_creation_from_blocked_rdds(self):
-        x, y, z = np.arange(80).reshape((40, 2)), np.arange(40), range(40)
+        x = np.arange(80).reshape((40, 2))
+        y = np.arange(40)
+        z = list(range(40))
         x_rdd = ArrayRDD(self.sc.parallelize(x, 4))
         y_rdd = ArrayRDD(self.sc.parallelize(y, 4))
         z_rdd = BlockRDD(self.sc.parallelize(z, 4), dtype=list)
 
-        expected = (np.arange(20).reshape(10, 2), np.arange(10), range(10))
+        expected = (
+            np.arange(20).reshape(10, 2),
+            np.arange(10), list(range(10))
+        )
         rdd = DictRDD([x_rdd, y_rdd, z_rdd])
         assert_tuple_equal(rdd.first(), expected)
         rdd = DictRDD([x_rdd, y_rdd, z_rdd], columns=('x', 'y', 'z'))
