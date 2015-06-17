@@ -3,6 +3,7 @@
 import numpy as np
 import scipy.sparse as sp
 from sklearn.feature_extraction import DictVectorizer
+from sklearn.externals import six
 
 from ..rdd import DictRDD
 from pyspark import AccumulatorParam
@@ -104,7 +105,7 @@ class SparkDictVectorizer(DictVectorizer, SparkBroadcasterMixin):
         def mapper(X, separator=self.separator):
             feature_names = []
             for x in X:
-                for f, v in x.iteritems():
+                for f, v in six.iteritems(x):
                     if isinstance(v, basestring):
                         f = "%s%s%s" % (f, separator, v)
                     feature_names.append(f)
