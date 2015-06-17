@@ -252,12 +252,7 @@ Sparkit-learn introduces three important distributed data format:
 
    .. code:: python
 
-<<<<<<< HEAD
-       Z.blocks # 4 - number of blocks
-       Z.shape # (20,2) - the shape of the whole dataset
-=======
        len(Z) # 8 - number of blocks
->>>>>>> dense_sparse_rdd
        Z.columns # returns ('X', 'y')
        Z.dtype # returns the types in correct order
        # [numpy.ndarray, numpy.ndarray]
@@ -309,14 +304,9 @@ SparkCountVectorizer
     local = CountVectorizer()
     dist = SparkCountVectorizer()
 
-<<<<<<< HEAD
-    result_local = local_vect.fit_transform(X)
-    result_dist = dist_vect.fit_transform(X_rdd)  # ArrayRDD
-=======
     result_local = local.fit_transform(X)
     result_dist = dist.fit_transform(X_rdd)  # SparseRDD
 
->>>>>>> dense_sparse_rdd
 
 SparkHashingVectorizer
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -333,14 +323,9 @@ SparkHashingVectorizer
     local = HashingVectorizer()
     dist = SparkHashingVectorizer()
 
-<<<<<<< HEAD
-    result_local = local_vect.fit_transform(X)
-    result_dist = dist_vect.fit_transform(X_rdd)  # ArrayRDD
-=======
     result_local = local.fit_transform(X)
     result_dist = dist.fit_transform(X_rdd)  # SparseRDD
 
->>>>>>> dense_sparse_rdd
 
 SparkTfidfTransformer
 ^^^^^^^^^^^^^^^^^^^^^
@@ -391,15 +376,10 @@ Distributed Classifiers
     X = [...]  # list of texts
     y = [...]  # list of labels
     X_rdd = sc.parallelize(X, 4)
-<<<<<<< HEAD
-    y_rdd = sc.parallelize(y, 4)
-    Z = DictRDD(X_rdd.zip(y_rdd), columns=('X', 'y'))
-=======
     y_rdd = sc.parralelize(y, 4)
     Z = DictRDD((X_rdd, y_rdd),
                 columns=('X', 'y'),
                 dtype=[np.ndarray, np.ndarray])
->>>>>>> dense_sparse_rdd
 
     local_pipeline = Pipeline((
         ('vect', HashingVectorizer()),
@@ -434,15 +414,10 @@ Distributed Model Selection
     X = [...]
     y = [...]
     X_rdd = sc.parallelize(X, 4)
-<<<<<<< HEAD
-    y_rdd = sc.parallelize(y, 4)
-    Z = DictRDD(X_rdd.zip(y_rdd), columns=('X', 'y'))
-=======
     y_rdd = sc.parralelize(y, 4)
     Z = DictRDD((X_rdd, y_rdd),
                 columns=('X', 'y'),
                 dtype=[np.ndarray, np.ndarray])
->>>>>>> dense_sparse_rdd
 
     parameters = {'alpha': [0.1, 1, 10]}
     fit_params = {'classes': np.unique(y)}
