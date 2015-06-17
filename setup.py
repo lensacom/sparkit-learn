@@ -17,7 +17,7 @@ def is_numpy_installed():
 def setup_package():
     metadata = dict(
         name='sparkit-learn',
-        version="0.2.3",
+        version="0.2.4",
         description='Scikit-learn on PySpark',
         author='Krisztian Szucs, Andras Fulop',
         author_email='krisztian.szucs@lensa.com, andras.fulop@lensa.com',
