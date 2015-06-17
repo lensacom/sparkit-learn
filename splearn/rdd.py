@@ -685,14 +685,16 @@ class DictRDD(BlockRDD):
         if column is None:
             indices = list(range(len(self.columns)))
         else:
-            if not hasattr(column, '__iter__'):
+            # TODO: find a better way
+            #if not hasattr(column, '__iter__'):
+            if not type(column) in (list, tuple):
                 column = [column]
             indices = [self.columns.index(c) for c in column]
 
         if dtype is not None:
-            # TEMP solution, find a better way!
+            # TODO: find a better way!
             #if not hasattr(dtype, '__iter__'):
-            if not type(dtype) in (list, tuple, set):
+            if not type(dtype) in (list, tuple):
                 dtype = [dtype]
             dtypes = [dtype[i] if i in indices else t
                       for i, t in enumerate(self.dtype)]
