@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
+import scipy.sparse as sp
 from sklearn.base import copy
 from sklearn.naive_bayes import (BaseDiscreteNB, BaseNB, BernoulliNB,
                                  GaussianNB, MultinomialNB)
 from splearn.base import SparkClassifierMixin
+from utils.validation import check_rdd
 
 
 class SparkBaseNB(BaseNB, SparkClassifierMixin):
@@ -27,6 +29,7 @@ class SparkBaseNB(BaseNB, SparkClassifierMixin):
         C : RDD with arrays, shape = [n_samples]
             Predicted target values for X
         """
+        check_rdd(X, (sp.spmatrix, np.ndarray))
         return X.map(
             lambda X: super(SparkBaseNB, self).predict(X))
 
@@ -45,6 +48,7 @@ class SparkBaseNB(BaseNB, SparkClassifierMixin):
             the models for each RDD block. The columns correspond to the classes
             in sorted order, as they appear in the attribute `classes_`.
         """
+        check_rdd(X, (sp.spmatrix, np.ndarray))
         return X.map(
             lambda X: super(SparkBaseNB, self).predict_proba(X))
 
@@ -64,6 +68,7 @@ class SparkBaseNB(BaseNB, SparkClassifierMixin):
             the model for each RDD block. The columns correspond to the classes
             in sorted order, as they appear in the attribute `classes_`.
         """
+        check_rdd(X, (sp.spmatrix, np.ndarray))
         return X.map(
             lambda X: super(SparkBaseNB, self).predict_log_proba(X))
 
@@ -114,6 +119,7 @@ class SparkGaussianNB(GaussianNB, SparkBaseNB):
         self : object
             Returns self.
         """
+        check_rdd(Z, {'X': (sp.spmatrix, np.ndarray), 'y': (sp.spmatrix, np.ndarray)})
         models = Z[:, ['X', 'y']].map(
             lambda X_y: self.partial_fit(X_y[0], X_y[1], classes))
         avg = models.sum()
@@ -182,6 +188,7 @@ class SparkBaseDiscreteNB(BaseDiscreteNB, SparkBaseNB):
 
     def fit(self, Z, classes=None):
         """
+        TODO fulibacsi fix docstring
         Fit Multinomial Naive Bayes according to (X,y) pair
         which is zipped into TupleRDD Z.
 
@@ -198,6 +205,7 @@ class SparkBaseDiscreteNB(BaseDiscreteNB, SparkBaseNB):
         self : object
             Returns self.
         """
+        check_rdd(Z, {'X': (sp.spmatrix, np.ndarray), 'y': (sp.spmatrix, np.ndarray)})
         if 'w' in Z.columns:
             models = Z[:, ['X', 'y', 'w']].map(
                 lambda X_y_w: self.partial_fit(
