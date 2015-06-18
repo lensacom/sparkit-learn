@@ -499,7 +499,10 @@ class SparseRDD(BlockRDD, ArrayLikeRDDMixin):
 
     def dot(self, other):
         rdd = self._rdd.map(lambda x: x.dot(other))
-        return SparseRDD(rdd, noblock=True)
+        if sp.issparse(other):
+            return SparseRDD(rdd, bsize=self.bsize, noblock=True)
+        else:
+            return ArrayRDD(rdd, bsize=self.bsize, noblock=True)
 
     def min(self, axis=None):
         return self._on_axis('min', axis)
