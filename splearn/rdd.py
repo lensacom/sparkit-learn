@@ -613,7 +613,6 @@ class DictRDD(BlockRDD):
             return DictRDD(rdd, bsize=self.bsize, columns=self.dtype[key],
                            dtype=self.dtype[key], noblock=True)
         elif hasattr(key, "__iter__") and not isinstance(key, six.string_types):
-            print("@dictrdd.get:", key)
             if tuple(key) == self.columns:
                 return self
             indices = [self.columns.index(k) for k in key]
