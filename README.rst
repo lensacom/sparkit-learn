@@ -443,11 +443,8 @@ Special thanks
 - spylearn community
 - pyspark community
 
-|Analytics|
 
 .. |Build Status| image:: https://travis-ci.org/lensacom/sparkit-learn.png?branch=master
    :target: https://travis-ci.org/lensacom/sparkit-learn
 .. |PyPi| image:: https://img.shields.io/pypi/v/sparkit-learn.svg
    :target: https://pypi.python.org/pypi/sparkit-learn
-.. |Analytics| image:: https://ga-beacon.appspot.com/UA-57495026-1/sparkit-learn/readme?pixel
-   :target: https://github.com/lensacom/sparkit-learn
