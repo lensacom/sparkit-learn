@@ -393,24 +393,31 @@ class ArrayRDD(BlockRDD, ArrayLikeRDDMixin):
             raise ValueError("Only supported type for ArrayRDD is np.ndarray!")
         super(ArrayRDD, self).__init__(rdd, bsize, dtype, noblock)
 
-    def _on_axis(self, func, axis=None):
-        rdd = self._rdd.map(lambda x: getattr(x, func)(axis=axis))
+    def __mul__(self, other):
+        return self.multiply(other)
 
-        if axis is None:
-            return getattr(np.array(rdd.collect()), func)()
-        elif axis == 0:
-            return rdd.reduce(
-                lambda a, b: getattr(np.array((a, b)), func)(axis=0))
-        else:
-            return rdd.reduce(lambda a, b: np.concatenate((a, b)))
+    def __add__(self, other):
+        return self.add(other)
+
+    def __sub__(self, other):
+        return self.subtract(other)
+
+    def __div__(self, other):
+        return self.divide(other)
+
+    __truediv__ = __div__
+
+    def __pow__(self, other):
+        return self.power(other)
+
+    def __floordiv__(self, other):
+        return self.floor_divide(other)
+
+    def __mod__(self, other):
+        return self.mod(other)
 
     def tosparse(self):
         return SparseRDD(self._rdd.map(lambda x: sp.csr_matrix(x)))
-
-    def dot(self, other):
-        # TODO naive dot implementation with another ArrayRDD
-        rdd = self._rdd.map(lambda x: x.dot(other))
-        return ArrayRDD(rdd, bsize=self.bsize, noblock=True)
 
     def flatten(self):
         return self.map(lambda x: x.flatten())
@@ -424,14 +431,42 @@ class ArrayRDD(BlockRDD, ArrayLikeRDDMixin):
     def prod(self, axis=None):
         return self._on_axis('prod', axis)
 
+    def dot(self, other):
+        return self._on_other('dot', other)
 
-class SparseRDD(BlockRDD, ArrayLikeRDDMixin):
+    def add(self, other):
+        return self._on_other('add', other)
 
-    def __init__(self, rdd, bsize=-1, dtype=sp.spmatrix, noblock=False):
-        if dtype is not sp.spmatrix:
-            raise ValueError("Only supported type for SparseRDD is"
-                             " sp.spmatrix!")
-        super(SparseRDD, self).__init__(rdd, bsize, dtype, noblock)
+    def subtract(self, other):
+        return self._on_other('subtract', other)
+
+    def multiply(self, other):
+        return self._on_other('multiply', other)
+
+    def divide(self, other):
+        return self._on_other('divide', other)
+
+    def power(self, other):
+        return self._on_other('power', other)
+
+    def floor_divide(self, other):
+        return self._on_other('floor_divide', other)
+
+    def true_divide(self, other):
+        return self._on_other('true_divide', other)
+
+    def mod(self, other):
+        return self._on_other('mod', other)
+
+    def fmod(self, other):
+        return self._on_other('fmod', other)
+
+    def remainder(self, other):
+        return self._on_other('remainder', other)
+
+    def _on_other(self, func, other):
+        rdd = self._rdd.map(lambda x: getattr(np, func)(x, other))
+        return ArrayRDD(rdd, noblock=True)
 
     def _on_axis(self, func, axis=None):
         rdd = self._rdd.map(lambda x: getattr(x, func)(axis=axis))
@@ -440,9 +475,18 @@ class SparseRDD(BlockRDD, ArrayLikeRDDMixin):
             return getattr(np.array(rdd.collect()), func)()
         elif axis == 0:
             return rdd.reduce(
-                lambda a, b: getattr(sp.vstack((a, b)), func)(axis=0))
+                lambda a, b: getattr(np.array((a, b)), func)(axis=0))
         else:
-            return rdd.reduce(lambda a, b: sp.vstack((a, b)))
+            return rdd.reduce(lambda a, b: np.concatenate((a, b)))
+
+
+class SparseRDD(BlockRDD, ArrayLikeRDDMixin):
+
+    def __init__(self, rdd, bsize=-1, dtype=sp.spmatrix, noblock=False):
+        if dtype is not sp.spmatrix:
+            raise ValueError("Only supported type for SparseRDD is"
+                             " sp.spmatrix!")
+        super(SparseRDD, self).__init__(rdd, bsize, dtype, noblock)
 
     def toarray(self):
         """Returns the data as numpy.array from each partition."""
@@ -465,6 +509,17 @@ class SparseRDD(BlockRDD, ArrayLikeRDDMixin):
 
     def max(self, axis=None):
         return self._on_axis('max', axis)
+
+    def _on_axis(self, func, axis=None):
+        rdd = self._rdd.map(lambda x: getattr(x, func)(axis=axis))
+
+        if axis is None:
+            return getattr(np.array(rdd.collect()), func)()
+        elif axis == 0:
+            return rdd.reduce(
+                lambda a, b: getattr(sp.vstack((a, b)), func)(axis=0))
+        else:
+            return rdd.reduce(lambda a, b: sp.vstack((a, b)))
 
 
 class DictRDD(BlockRDD):

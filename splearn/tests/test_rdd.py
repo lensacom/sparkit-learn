@@ -468,8 +468,109 @@ class TestDenseMath(SplearnTestCase):
     def test_dot(self):
         A, A_rdd = self.make_dense_rdd((20, 10))
         B, B_rdd = self.make_dense_rdd((10, 20))
-        assert_array_almost_equal(A_rdd.dot(B).toarray(), A.dot(B))
-        assert_array_almost_equal(B_rdd.dot(A).toarray(), B.dot(A))
+        assert_array_equal(A_rdd.dot(B).toarray(), A.dot(B))
+        assert_array_equal(B_rdd.dot(A).toarray(), B.dot(A))
+
+    def test_add(self):
+        A, A_rdd = self.make_dense_rdd((8, 3))
+        B, B_rdd = self.make_dense_rdd((1, 3))
+        np_res = A + B
+        assert_array_equal(
+            A_rdd.add(B).toarray(), np_res
+        )
+        assert_array_equal((A_rdd + B).toarray(), np_res)
+        A_rdd += B
+        assert_array_equal(A_rdd.toarray(), np_res)
+
+    def test_subtract(self):
+        A, A_rdd = self.make_dense_rdd((8, 3))
+        B, B_rdd = self.make_dense_rdd((1, 3))
+        np_res = A - B
+        assert_array_equal(
+            A_rdd.subtract(B).toarray(), np_res
+        )
+        assert_array_equal((A_rdd - B).toarray(), np_res)
+        A_rdd -= B
+        assert_array_equal(A_rdd.toarray(), np_res)
+
+    def test_multiply(self):
+        A, A_rdd = self.make_dense_rdd((8, 3))
+        B, B_rdd = self.make_dense_rdd((1, 3))
+        np_res = A * B
+        assert_array_equal(
+            A_rdd.multiply(B).toarray(), np_res
+        )
+        assert_array_equal((A_rdd * B).toarray(), np_res)
+        A_rdd *= B
+        assert_array_equal(A_rdd.toarray(), np_res)
+
+    def test_divide(self):
+        A, A_rdd = self.make_dense_rdd((8, 3))
+        B, B_rdd = self.make_dense_rdd((1, 3))
+        np_res = A / B
+        assert_array_equal(
+            A_rdd.divide(B).toarray(), np_res
+        )
+        assert_array_equal((A_rdd / B).toarray(), np_res)
+        A_rdd /= B
+        assert_array_equal(A_rdd.toarray(), np_res)
+
+    def test_power(self):
+        A, A_rdd = self.make_dense_rdd((8, 3))
+        B, B_rdd = self.make_dense_rdd((1, 3))
+        np_res = A ** B
+        assert_array_equal(
+            A_rdd.power(B).toarray(), np_res
+        )
+        assert_array_equal((A_rdd ** B).toarray(), np_res)
+        A_rdd **= B
+        assert_array_equal(A_rdd.toarray(), np_res)
+
+    def test_floor_divide(self):
+        A, A_rdd = self.make_dense_rdd((8, 3))
+        B, B_rdd = self.make_dense_rdd((1, 3))
+        np_res = A // B
+        assert_array_equal(
+            A_rdd.floor_divide(B).toarray(), np_res
+        )
+        assert_array_equal((A_rdd // B).toarray(), np_res)
+        A_rdd //= B
+        assert_array_equal(A_rdd.toarray(), np_res)
+
+    def test_true_divide(self):
+        A, A_rdd = self.make_dense_rdd((8, 3))
+        B, B_rdd = self.make_dense_rdd((1, 3))
+        np_res = A / B
+        assert_array_equal(
+            A_rdd.true_divide(B).toarray(), np_res
+        )
+
+    def test_mod(self):
+        A, A_rdd = self.make_dense_rdd((8, 3))
+        B, B_rdd = self.make_dense_rdd((1, 3))
+        np_res = A % B
+        assert_array_equal(
+            A_rdd.mod(B).toarray(), np_res
+        )
+        assert_array_equal((A_rdd % B).toarray(), np_res)
+        A_rdd %= B
+        assert_array_equal(A_rdd.toarray(), np_res)
+
+    def test_fmod(self):
+        A, A_rdd = self.make_dense_rdd((8, 3))
+        B, B_rdd = self.make_dense_rdd((1, 3))
+        np_res = np.fmod(A, B)
+        assert_array_equal(
+            A_rdd.fmod(B).toarray(), np_res
+        )
+
+    def test_remainder(self):
+        A, A_rdd = self.make_dense_rdd((8, 3))
+        B, B_rdd = self.make_dense_rdd((1, 3))
+        np_res = np.remainder(A, B)
+        assert_array_equal(
+            A_rdd.remainder(B).toarray(), np_res
+        )
 
     def test_flatten(self):
         X, X_rdd = self.make_dense_rdd((100, 3, 2))
