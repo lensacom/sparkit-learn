@@ -1,7 +1,7 @@
 Sparkit-learn
 =============
 
-|Build Status| |PyPi|
+|Build Status| |PyPi| |Gitter|
 
 **PySpark + Scikit-learn = Sparkit-learn**
 
@@ -448,3 +448,6 @@ Special thanks
    :target: https://travis-ci.org/lensacom/sparkit-learn
 .. |PyPi| image:: https://img.shields.io/pypi/v/sparkit-learn.svg
    :target: https://pypi.python.org/pypi/sparkit-learn
+.. |Gitter| image:: https://badges.gitter.im/Join%20Chat.svg
+   :alt: Join the chat at https://gitter.im/lensacom/sparkit-learn
+   :target: https://gitter.im/lensacom/sparkit-learn
