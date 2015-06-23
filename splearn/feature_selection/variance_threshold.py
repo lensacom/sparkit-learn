@@ -5,8 +5,8 @@ from sklearn.utils import check_array
 from sklearn.utils.sparsefuncs import mean_variance_axis
 
 from ..rdd import DictRDD
-from .base import SparkSelectorMixin
 from ..utils.validation import check_rdd
+from .base import SparkSelectorMixin
 
 
 class SparkVarianceThreshold(VarianceThreshold, SparkSelectorMixin):

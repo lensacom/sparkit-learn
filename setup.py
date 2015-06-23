@@ -2,8 +2,7 @@
 
 import sys
 
-from setuptools import setup
-from setuptools import find_packages
+from setuptools import find_packages, setup
 
 
 def is_numpy_installed():
@@ -17,7 +16,7 @@ def is_numpy_installed():
 def setup_package():
     metadata = dict(
         name='sparkit-learn',
-        version="0.2.4",
+        version='0.2.5',
         description='Scikit-learn on PySpark',
         author='Krisztian Szucs, Andras Fulop',
         author_email='krisztian.szucs@lensa.com, andras.fulop@lensa.com',
@@ -33,7 +32,8 @@ def setup_package():
         if is_numpy_installed() is False:
             raise ImportError("Numerical Python (NumPy) is not installed.\n"
                               "sparkit-learn requires NumPy.\n"
-                              "Installation instructions are available on scikit-learn website: "
+                              "Installation instructions are available on "
+                              "scikit-learn website: "
                               "http://scikit-learn.org/stable/install.html\n")
 
     setup(**metadata)

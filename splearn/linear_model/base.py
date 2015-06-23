@@ -1,8 +1,7 @@
 # encoding: utf-8
 
-import scipy.sparse as sp
 import numpy as np
-
+import scipy.sparse as sp
 from sklearn.base import copy
 from sklearn.linear_model.base import LinearRegression
 

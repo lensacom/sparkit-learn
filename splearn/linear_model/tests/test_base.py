@@ -1,7 +1,8 @@
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from splearn.linear_model import SparkLinearRegression
-from splearn.utils.testing import SplearnTestCase, assert_array_almost_equal, assert_true
+from splearn.utils.testing import (SplearnTestCase, assert_array_almost_equal,
+                                   assert_true)
 from splearn.utils.validation import check_rdd_dtype
 
 

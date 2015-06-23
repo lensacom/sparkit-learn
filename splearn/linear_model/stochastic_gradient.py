@@ -4,8 +4,8 @@ import numpy as np
 import scipy.sparse as sp
 from sklearn.linear_model import SGDClassifier
 
-from .base import SparkLinearModelMixin
 from ..utils.validation import check_rdd
+from .base import SparkLinearModelMixin
 
 
 class SparkSGDClassifier(SGDClassifier, SparkLinearModelMixin):

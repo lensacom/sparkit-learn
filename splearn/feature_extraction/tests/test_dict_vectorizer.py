@@ -1,5 +1,5 @@
-import scipy.sparse as sp
 import numpy as np
+import scipy.sparse as sp
 from sklearn.feature_extraction import DictVectorizer
 from splearn.feature_extraction import SparkDictVectorizer
 from splearn.rdd import ArrayRDD

@@ -2,13 +2,13 @@
 
 import numpy as np
 import scipy.sparse as sp
-from sklearn.feature_extraction import DictVectorizer
-from sklearn.externals import six
-
-from ..rdd import DictRDD
 from pyspark import AccumulatorParam
-from ..utils.validation import check_rdd
+from sklearn.externals import six
+from sklearn.feature_extraction import DictVectorizer
+
 from ..base import SparkBroadcasterMixin
+from ..rdd import DictRDD
+from ..utils.validation import check_rdd
 
 
 class SparkDictVectorizer(DictVectorizer, SparkBroadcasterMixin):

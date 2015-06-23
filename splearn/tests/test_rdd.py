@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.sparse as sp
 from pyspark import RDD
-from splearn.rdd import ArrayRDD, SparseRDD, BlockRDD, DictRDD, block
+from splearn.rdd import ArrayRDD, BlockRDD, DictRDD, SparseRDD, block
 from splearn.utils.testing import (SplearnTestCase, assert_almost_equal,
                                    assert_array_almost_equal,
                                    assert_array_equal, assert_equal,
