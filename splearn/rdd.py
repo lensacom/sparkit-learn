@@ -621,7 +621,7 @@ class DictRDD(BlockRDD):
             raise ValueError("Columns and dtype lengths must be equal!")
 
         self.columns = tuple(columns)
-        super(DictRDD, self).__init__(rdd, bsize, dtype, noblock)
+        super(DictRDD, self).__init__(rdd, bsize, tuple(dtype), noblock)
 
     def _block(self, rdd, bsize, dtype):
         """Execute the blocking process on the given rdd.
@@ -739,18 +739,14 @@ class DictRDD(BlockRDD):
         if column is None:
             indices = list(range(len(self.columns)))
         else:
-            # TODO: find a better way
-            #if not hasattr(column, '__iter__'):
             if not type(column) in (list, tuple):
                 column = [column]
             indices = [self.columns.index(c) for c in column]
 
         if dtype is not None:
-            # TODO: find a better way!
-            #if not hasattr(dtype, '__iter__'):
             if not type(dtype) in (list, tuple):
                 dtype = [dtype]
-            dtypes = [dtype[i] if i in indices else t
+            dtypes = [dtype[indices.index(i)] if i in indices else t
                       for i, t in enumerate(self.dtype)]
 
         def mapper(values):

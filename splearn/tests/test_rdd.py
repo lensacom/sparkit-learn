@@ -8,6 +8,7 @@ from splearn.utils.testing import (SplearnTestCase, assert_almost_equal,
                                    assert_is_instance,
                                    assert_multiple_tuples_equal, assert_raises,
                                    assert_true, assert_tuple_equal)
+from splearn.utils.validation import check_rdd_dtype
 
 
 class TestBlocking(SplearnTestCase):
@@ -633,6 +634,24 @@ class TestDictRDD(SplearnTestCase):
         assert_is_instance(DictRDD(rdd, bsize=None), DictRDD)
         assert_is_instance(DictRDD(rdd), BlockRDD)
 
+    def test_creation_from_zipped_rdd(self):
+        x = np.arange(80).reshape((40, 2))
+        y = range(40)
+        x_rdd = self.sc.parallelize(x, 4)
+        y_rdd = self.sc.parallelize(y, 4)
+        zipped_rdd = x_rdd.zip(y_rdd)
+
+        expected = (np.arange(20).reshape(10, 2), tuple(range(10)))
+
+        rdd = DictRDD(zipped_rdd)
+        assert_tuple_equal(rdd.first(), expected)
+        rdd = DictRDD(zipped_rdd, columns=('x', 'y'))
+        assert_tuple_equal(rdd.first(), expected)
+        rdd = DictRDD(zipped_rdd, dtype=(np.ndarray, list))
+        first = rdd.first()
+        assert_tuple_equal(first, expected)
+        assert_is_instance(first[1], list)
+
     def test_creation_from_rdds(self):
         x = np.arange(80).reshape((40, 2))
         y = np.arange(40)
@@ -675,6 +694,28 @@ class TestDictRDD(SplearnTestCase):
         first = rdd.first()
         assert_tuple_equal(first, expected)
         assert_is_instance(first[2], list)
+
+    def test_auto_dtype(self):
+        x = np.arange(80).reshape((40, 2))
+        y = tuple(range(40))
+        z = list(range(40))
+        x_rdd = self.sc.parallelize(x, 4)
+        y_rdd = self.sc.parallelize(y, 4)
+        z_rdd = self.sc.parallelize(z, 4)
+
+        expected = (np.arange(20).reshape(10, 2), tuple(range(10)),
+                    list(range(10)))
+
+        rdd = DictRDD([x_rdd, y_rdd, z_rdd])
+        assert_tuple_equal(rdd.first(), expected)
+        assert_equal(rdd.dtype, (np.ndarray, tuple, tuple))
+        assert_true(check_rdd_dtype(rdd, {0: np.ndarray, 1: tuple, 2: tuple}))
+
+        rdd = DictRDD([x_rdd, y_rdd, z_rdd], columns=('x', 'y', 'z'))
+        assert_tuple_equal(rdd.first(), expected)
+        assert_equal(rdd.dtype, (np.ndarray, tuple, tuple))
+        assert_true(check_rdd_dtype(rdd, {'x': np.ndarray, 'y': tuple,
+                                          'z': tuple}))
 
     def test_get_single_tuple(self):
         x, y = np.arange(80).reshape((40, 2)), np.arange(40)
@@ -772,16 +813,16 @@ class TestDictRDD(SplearnTestCase):
         X = DictRDD(rdd1.zip(rdd2), bsize=5)
 
         X1 = [(x[0], x[1] ** 2) for x in X.collect()]
-        X2 = X.transform(lambda a, b: (a, b ** 2)).collect()
-        assert_multiple_tuples_equal(X1, X2)
+        X2 = X.transform(lambda a, b: (a, b ** 2))
+        assert_multiple_tuples_equal(X1, X2.collect())
 
         X1 = [(x[0], x[1] ** 2) for x in X.collect()]
-        X2 = X.transform(lambda x: x ** 2, column=1).collect()
-        assert_multiple_tuples_equal(X1, X2)
+        X2 = X.transform(lambda x: x ** 2, column=1)
+        assert_multiple_tuples_equal(X1, X2.collect())
 
         X1 = [(x[0] ** 2, x[1]) for x in X.collect()]
-        X2 = X.transform(lambda x: x ** 2, column=0).collect()
-        assert_multiple_tuples_equal(X1, X2)
+        X2 = X.transform(lambda x: x ** 2, column=0)
+        assert_multiple_tuples_equal(X1, X2.collect())
 
         X1 = [(x[0] ** 2, x[1] ** 0.5) for x in X.collect()]
         X2 = X.transform(lambda a, b: (a ** 2, b ** 0.5), column=[0, 1])
@@ -790,3 +831,33 @@ class TestDictRDD(SplearnTestCase):
         X1 = [(x[0] ** 2, x[1] ** 0.5) for x in X.collect()]
         X2 = X.transform(lambda b, a: (b ** 0.5, a ** 2), column=[1, 0])
         assert_multiple_tuples_equal(X1, X2.collect())
+
+    def test_transform_with_dtype(self):
+        data1 = np.arange(400).reshape((100, 4))
+        data2 = np.arange(200).reshape((100, 2))
+        rdd1 = self.sc.parallelize(data1, 4)
+        rdd2 = self.sc.parallelize(data2, 4)
+
+        X = DictRDD(rdd1.zip(rdd2), bsize=5)
+
+        X2 = X.transform(lambda x: x ** 2, column=0)
+        print X2.dtype
+        assert_equal(X2.dtype, (np.ndarray, np.ndarray))
+
+        X2 = X.transform(lambda x: tuple((x ** 2).tolist()), column=0,
+                         dtype=tuple)
+        assert_equal(X2.dtype, (tuple, np.ndarray))
+        assert_true(check_rdd_dtype(X2, {0: tuple, 1: np.ndarray}))
+
+        X2 = X.transform(lambda x: x ** 2, column=1, dtype=list)
+        assert_equal(X2.dtype, (np.ndarray, list))
+        assert_true(check_rdd_dtype(X2, {0: np.ndarray, 1: list}))
+
+        X2 = X.transform(lambda a, b: (a ** 2, (b ** 0.5).tolist()),
+                         column=[0, 1], dtype=(np.ndarray, list))
+        assert_true(check_rdd_dtype(X2, {0: np.ndarray, 1: list}))
+
+        X2 = X.transform(lambda b, a: ((b ** 0.5).tolist(), a ** 2),
+                         column=[1, 0], dtype=(list, np.ndarray))
+        assert_equal(X2.dtype, (np.ndarray, list))
+        assert_true(check_rdd_dtype(X2, {0: np.ndarray, 1: list}))

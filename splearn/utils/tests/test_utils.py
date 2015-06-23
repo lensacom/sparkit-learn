@@ -5,6 +5,7 @@ from splearn.rdd import ArrayRDD, DictRDD, SparseRDD
 from sklearn.utils.testing import assert_false, assert_true, assert_raises
 from splearn.utils.testing import SplearnTestCase
 
+
 class TestUtilities(SplearnTestCase):
 
     def test_check_rdd_dtype(self):
