@@ -87,7 +87,6 @@ class SparkDictVectorizer(DictVectorizer, SparkBroadcasterMixin):
         self
         """
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
-        check_rdd(X, (np.ndarray,))
 
         """Create vocabulary
         """
@@ -142,9 +141,6 @@ class SparkDictVectorizer(DictVectorizer, SparkBroadcasterMixin):
         Z : transformed, containing {array, sparse matrix}
             Feature vectors; always 2-d.
         """
-        X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
-        check_rdd(X, (np.ndarray, sp.spmatrix))
-
         mapper = self.broadcast(super(SparkDictVectorizer, self).transform,
                                 Z.context)
         dtype = sp.spmatrix if self.sparse else np.ndarray
