@@ -841,7 +841,6 @@ class TestDictRDD(SplearnTestCase):
         X = DictRDD(rdd1.zip(rdd2), bsize=5)
 
         X2 = X.transform(lambda x: x ** 2, column=0)
-        print X2.dtype
         assert_equal(X2.dtype, (np.ndarray, np.ndarray))
 
         X2 = X.transform(lambda x: tuple((x ** 2).tolist()), column=0,
