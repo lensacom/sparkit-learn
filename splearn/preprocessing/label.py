@@ -17,28 +17,31 @@ class SparkLabelEncoder(LabelEncoder, SparkTransformerMixin,
         Holds the label for each class.
     Examples
     --------
-    `LabelEncoder` can be used to normalize labels.
-    >>> from splearn import preprocessing
-    >>> le = preprocessing.LabelEncoder()
-    >>> le.fit([1, 2, 2, 6])
-    LabelEncoder()
+    `SparkLabelEncoder` can be used to normalize labels.
+    >>> from splearn.preprocessing import SparkLabelEncoder
+    >>> from splearn import BlockRDD
+    >>>
+    >>> data = ["paris", "paris", "tokyo", "amsterdam"]
+    >>> y = BlockRDD(sc.parallelize(data))
+    >>>
+    >>> le = SparkLabelEncoder()
+    >>> le.fit(y)
     >>> le.classes_
-    array([1, 2, 6])
-    >>> le.transform([1, 1, 2, 6]) #doctest: +ELLIPSIS
-    array([0, 0, 1, 2]...)
-    >>> le.inverse_transform([0, 0, 1, 2])
-    array([1, 1, 2, 6])
-    It can also be used to transform non-numerical labels (as long as they are
-    hashable and comparable) to numerical labels.
-    >>> le = preprocessing.LabelEncoder()
-    >>> le.fit(["paris", "paris", "tokyo", "amsterdam"])
-    LabelEncoder()
-    >>> list(le.classes_)
-    ['amsterdam', 'paris', 'tokyo']
-    >>> le.transform(["tokyo", "tokyo", "paris"]) #doctest: +ELLIPSIS
-    array([2, 2, 1]...)
-    >>> list(le.inverse_transform([2, 2, 1]))
-    ['tokyo', 'tokyo', 'paris']
+    array(['amsterdam', 'paris', 'tokyo'],
+          dtype='|S9')
+    >>>
+    >>> test = ["tokyo", "tokyo", "paris"]
+    >>> y_test = BlockRDD(sc.parallelize(test))
+    >>>
+    >>> le.transform(y_test).toarray()
+    array([2, 2, 1])
+    >>>
+    >>> test = [2, 2, 1]
+    >>> y_test = BlockRDD(sc.parallelize(test))
+    >>>
+    >>> le.inverse_transform(y_test).toarray()
+    array(['tokyo', 'tokyo', 'paris'],
+          dtype='|S9')
     """
 
     __transient__ = ['classes_']
