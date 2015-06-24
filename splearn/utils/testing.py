@@ -83,6 +83,12 @@ class SplearnTestCase(unittest.TestCase):
         X_rdd = ArrayRDD(self.sc.parallelize(X, 4), bsize=block_size)
         return X, X_rdd
 
+    def make_dense_randint_rdd(self, low, high=None, shape=(1e3, 10),
+                               block_size=-1):
+        X = np.random.randint(low, high, size=shape)
+        X_rdd = ArrayRDD(self.sc.parallelize(X, 4), bsize=block_size)
+        return X, X_rdd
+
     def make_dense_range_rdd(self, shape=(1e3, 10), block_size=-1):
         X = np.arange(np.prod(shape)).reshape(shape)
         X_rdd = ArrayRDD(self.sc.parallelize(X, 4), bsize=block_size)
