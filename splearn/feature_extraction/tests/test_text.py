@@ -1,5 +1,5 @@
-import scipy.sparse as sp
 import numpy as np
+import scipy.sparse as sp
 from sklearn.feature_extraction.text import (CountVectorizer,
                                              HashingVectorizer,
                                              TfidfTransformer)
@@ -7,7 +7,8 @@ from splearn.feature_extraction.text import (SparkCountVectorizer,
                                              SparkHashingVectorizer,
                                              SparkTfidfTransformer)
 from splearn.utils.testing import (SplearnTestCase, assert_array_almost_equal,
-                                   assert_array_equal, assert_equal, assert_true)
+                                   assert_array_equal, assert_equal,
+                                   assert_true)
 from splearn.utils.validation import check_rdd_dtype
 
 

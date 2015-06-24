@@ -80,6 +80,6 @@ class TestVarianceThreshold(SplearnTestCase):
                                   result_dist.toarray())
 
         result_dist = dist.fit_transform(Z_rdd)[:, 'X']
-        assert_true(check_rdd_dtype(result_dist, (sp.spmatrix,)))        
+        assert_true(check_rdd_dtype(result_dist, (sp.spmatrix,)))
         assert_array_almost_equal(result_local.toarray(),
                                   result_dist.toarray())

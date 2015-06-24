@@ -1,9 +1,10 @@
 import numpy as np
 import scipy.sparse as sp
-from splearn.utils.validation import check_rdd_dtype, check_rdd
+from sklearn.utils.testing import assert_false, assert_raises, assert_true
 from splearn.rdd import ArrayRDD, DictRDD, SparseRDD
-from sklearn.utils.testing import assert_false, assert_true, assert_raises
 from splearn.utils.testing import SplearnTestCase
+from splearn.utils.validation import check_rdd, check_rdd_dtype
+
 
 class TestUtilities(SplearnTestCase):
 
@@ -53,4 +54,3 @@ class TestUtilities(SplearnTestCase):
         assert_raises(TypeError, check_rdd, (dict_rdd, {'X': (array, spmat)}))
         assert_raises(TypeError, check_rdd, (dict_rdd, (tuple,)))
         assert_raises(TypeError, check_rdd, (np.arange(20), (array,)))
-

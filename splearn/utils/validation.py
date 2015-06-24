@@ -1,4 +1,4 @@
-from splearn.rdd import DictRDD, BlockRDD
+from splearn.rdd import BlockRDD, DictRDD
 
 
 def check_rdd_dtype(rdd, expected_dtype):
@@ -37,6 +37,7 @@ def check_rdd_dtype(rdd, expected_dtype):
         expected_dtype = [expected_dtype]
 
     return rdd.dtype in expected_dtype
+
 
 def check_rdd(rdd, expected_dtype):
     """Wrapper function to check_rdd_dtype. Raises TypeError in case of dtype
