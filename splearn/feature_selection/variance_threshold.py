@@ -82,6 +82,7 @@ class SparkVarianceThreshold(VarianceThreshold, SparkSelectorMixin):
                      ((n_a * n_b) * ((mean_b - mean_a) / n_ab) ** 2)
             return (n_ab, mean_ab, var_ab)
 
+        self._clear_broadcast()
         _, _, self.variances_ = X.map(mapper).treeReduce(reducer)
 
         if np.all(self.variances_ <= self.threshold):

@@ -293,6 +293,7 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
         self.vocabulary_ = self._init_vocab(X)
 
         # transform according to vocabulary
+        self._clear_broadcast()
         mapper = self.broadcast(self._count_vocab, A.context)
         Z = A.transform(mapper, column='X', dtype=sp.spmatrix)
         Z = Z.persist()
@@ -327,6 +328,7 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
 
             Z = Z.transform(lambda x: x[:, mask], column='X', dtype=sp.spmatrix)
 
+        self._clear_broadcast()
         return Z
 
     def transform(self, Z):
@@ -571,6 +573,8 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
             # log1p instead of log makes sure terms with zero idf don't get
             # suppressed entirely
             idf = np.log(float(n_samples) / df) + 1.0
+
+            self._clear_broadcast()
             self._idf_diag = sp.spdiags(idf,
                                         diags=0, m=n_features, n=n_features)
         return self

@@ -65,6 +65,7 @@ class SparkLabelEncoder(LabelEncoder, SparkTransformerMixin,
         def reducer(a, b):
             return np.unique(np.concatenate((a, b)))
 
+        self._clear_broadcast()
         self.classes_ = y.map(mapper).reduce(reducer)
 
         return self

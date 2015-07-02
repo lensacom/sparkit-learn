@@ -300,6 +300,7 @@ class SparkTruncatedSVD(TruncatedSVD, SparkBroadcasterMixin):
             Sigma, V = svd_em(X, k=self.n_components, maxiter=self.n_iter,
                               tol=self.tol, compute_u=False,
                               seed=self.random_state)
+            self._clear_broadcast()
             self.components_ = V
             X.unpersist()
             return self.transform(Z)

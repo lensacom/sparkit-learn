@@ -5,17 +5,21 @@ from sklearn.metrics import accuracy_score
 
 
 class SparkBroadcasterMixin(object):
+    _bcvars = None
 
-    # TODO: consider caching in case of streaming
     def broadcast(self, func, context):
-        bcvars = {name: context.broadcast(getattr(self, name))
-                  for name in self.__transient__}
+        if not self._bcvars:
+            self._bcvars = {name: context.broadcast(getattr(self, name))
+                            for name in self.__transient__}
 
         def func_wrapper(*args, **kwargs):
-            for k, v in bcvars.items():
+            for k, v in self._bcvars.items():
                 setattr(func.__self__, k, v.value)
             return func(*args, **kwargs)
         return func_wrapper
+
+    def _clear_broadcast(self):
+        self._bcvars = None
 
 
 class SparkBaseEstimator(BaseEstimator):

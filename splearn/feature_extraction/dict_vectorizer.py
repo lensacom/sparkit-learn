@@ -118,6 +118,7 @@ class SparkDictVectorizer(DictVectorizer, SparkBroadcasterMixin):
 
         vocab = dict((f, i) for i, f in enumerate(feature_names))
 
+        self._clear_broadcast()
         self.feature_names_ = feature_names
         self.vocabulary_ = vocab
 
