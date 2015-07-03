@@ -1,10 +1,10 @@
 import numpy as np
 import scipy.sparse as sp
-from numpy.testing import assert_array_almost_equal
 from sklearn.feature_selection import VarianceThreshold
 from splearn.feature_selection import SparkVarianceThreshold
 from splearn.rdd import DictRDD
-from splearn.utils.testing import SplearnTestCase, assert_true
+from splearn.utils.testing import (SplearnTestCase, assert_array_almost_equal,
+                                   assert_true)
 from splearn.utils.validation import check_rdd_dtype
 
 
@@ -21,8 +21,8 @@ class TestVarianceThreshold(SplearnTestCase):
                   ((1e4, 100), 600)]
 
         for shape, block_size in shapes:
-            X_dense, X_dense_rdd = self.make_dense_rdd()
-            X_sparse, X_sparse_rdd = self.make_sparse_rdd()
+            X_dense, X_dense_rdd = self.make_dense_rdd(shape, block_size)
+            X_sparse, X_sparse_rdd = self.make_sparse_rdd(shape, block_size)
             Z = DictRDD([X_sparse_rdd, X_dense_rdd], columns=('X', 'Y'))
 
             local.fit(X_dense)
