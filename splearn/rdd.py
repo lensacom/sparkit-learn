@@ -303,7 +303,7 @@ class ArrayLikeRDDMixin(object):
     def shape(self):
         """Returns the shape of the data."""
         # TODO cache
-        first = self.first().shape
+        first = self._rdd.first().shape
         shape = self._rdd.map(lambda x: x.shape[0]).sum()
         return (shape,) + first[1:]
 
