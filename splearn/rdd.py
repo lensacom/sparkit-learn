@@ -227,6 +227,9 @@ class BlockRDD(object):
         """Returns the number of elements in all blocks."""
         return self._rdd.map(len).sum()
 
+    def __iter__(self):
+        return self._rdd.toLocalIterator()
+
     @property
     def context(self):
         return self._rdd.ctx

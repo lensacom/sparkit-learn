@@ -4,11 +4,14 @@ import numpy as np
 import scipy.sparse as sp
 from sklearn.base import copy
 from sklearn.linear_model.base import LinearRegression
+from splearn.base import SparkBroadcasterMixin
 
 from ..utils.validation import check_rdd
 
 
-class SparkLinearModelMixin(object):
+class SparkLinearModelMixin(SparkBroadcasterMixin):
+
+    __transient__ = ['coef_', 'intercept_']
 
     def __add__(self, other):
         """Add method for Linear models with coef and intercept attributes.
@@ -62,7 +65,7 @@ class SparkLinearModelMixin(object):
 
     __truediv__ = __div__
 
-    def _spark_fit(self, cls, Z, *args, **kwargs):
+    def _average_fit(self, cls, Z, *args, **kwargs):
         """Wraps a Scikit-learn Linear model's fit method to use with RDD
         input.
 
@@ -80,27 +83,10 @@ class SparkLinearModelMixin(object):
         mapper = lambda X_y: super(cls, self).fit(
             X_y[0], X_y[1], *args, **kwargs
         )
-        models = Z.map(mapper)
+        models = Z[:, ['X', 'y']].map(mapper)
         avg = models.sum() / models.count()
         self.__dict__.update(avg.__dict__)
         return self
-
-    def _spark_predict(self, cls, X, *args, **kwargs):
-        """Wraps a Scikit-learn Linear model's predict method to use with RDD
-        input.
-
-        Parameters
-        ----------
-        cls : class object
-            The sklearn linear model's class to wrap.
-        Z : ArrayRDD
-            The distributed data to predict in a DictRDD.
-
-        Returns
-        -------
-        self: the wrapped class
-        """
-        return X.map(lambda X: super(cls, self).predict(X, *args, **kwargs))
 
 
 class SparkLinearRegression(LinearRegression, SparkLinearModelMixin):
@@ -148,7 +134,7 @@ class SparkLinearRegression(LinearRegression, SparkLinearModelMixin):
         self : returns an instance of self.
         """
         check_rdd(Z, {'X': (sp.spmatrix, np.ndarray)})
-        return self._spark_fit(SparkLinearRegression, Z)
+        return self._average_fit(SparkLinearRegression, Z)
 
     def predict(self, X):
         """Distributed method to predict class labels for samples in X.
@@ -164,4 +150,6 @@ class SparkLinearRegression(LinearRegression, SparkLinearModelMixin):
             Predicted class label per sample.
         """
         check_rdd(X, (sp.spmatrix, np.ndarray))
-        return self._spark_predict(SparkLinearRegression, X)
+        mapper = self.broadcast(
+            super(SparkLinearRegression, self).predict, X.context)
+        return X.transform(mapper, column='X')

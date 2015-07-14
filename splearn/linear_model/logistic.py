@@ -134,7 +134,7 @@ class SparkLogisticRegression(LogisticRegression, SparkLinearModelMixin):
         # possible improve to partial_fit in partisions and then average
         # in final reduce
         self._classes_ = np.unique(classes)
-        return self._spark_fit(SparkLogisticRegression, Z)
+        return self._average_fit(SparkLogisticRegression, Z)
 
     def predict(self, X):
         """Distributed method to predict class labels for samples in X.
@@ -150,4 +150,6 @@ class SparkLogisticRegression(LogisticRegression, SparkLinearModelMixin):
             Predicted class label per sample.
         """
         check_rdd(X, (sp.spmatrix, np.ndarray))
-        return self._spark_predict(SparkLogisticRegression, X)
+        mapper = self.broadcast(
+            super(SparkLogisticRegression, self).predict, X.context)
+        return X.transform(mapper, column='X')
