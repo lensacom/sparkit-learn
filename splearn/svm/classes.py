@@ -116,7 +116,8 @@ class SparkLinearSVC(LinearSVC, SparkLinearModelMixin):
         """
         check_rdd(Z, {'X': (sp.spmatrix, np.ndarray)})
         self._classes_ = np.unique(classes)
-        return self._spark_fit(SparkLinearSVC, Z)
+
+        return self._average_fit(SparkLinearSVC, Z)
 
     def predict(self, X):
         """Distributed method to predict class labels for samples in X.

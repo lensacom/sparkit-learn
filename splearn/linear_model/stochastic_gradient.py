@@ -138,9 +138,13 @@ class SparkSGDClassifier(SGDClassifier, SparkLinearModelMixin):
 
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, learning_method='average', *args, **kwargs):
         super(SparkSGDClassifier, self).__init__(*args, **kwargs)
-        self.average = True  # force averaging
+        # self.average = True  # force averaging
+        if learning_method not in ['average', 'incremental']:
+            raise ValueError('learning_method must be either average or '
+                             'incremental, given {0}'.format(learning_method))
+        self.learning_method = learning_method
 
     # workaround to keep the classes parameter unchanged
     @property
@@ -169,7 +173,14 @@ class SparkSGDClassifier(SGDClassifier, SparkLinearModelMixin):
         """
         check_rdd(Z, {'X': (sp.spmatrix, np.ndarray)})
         self._classes_ = np.unique(classes)
-        return self._spark_fit(SparkSGDClassifier, Z)
+
+        if self.learning_method == 'average':
+            self._average_fit(SparkSGDClassifier, Z)
+        else:
+            for X, y in Z[:, ['X', 'y']]:
+                self.partial_fit(X, y)
+
+        return self
 
     def predict(self, X):
         """Distributed method to predict class labels for samples in X.
@@ -185,4 +196,6 @@ class SparkSGDClassifier(SGDClassifier, SparkLinearModelMixin):
             Predicted class label per sample.
         """
         check_rdd(X, (sp.spmatrix, np.ndarray))
-        return self._spark_predict(SparkSGDClassifier, X)
+        mapper = self.broadcast(
+            super(SparkSGDClassifier, self).predict, X.context)
+        return X.transform(mapper, column='X')
