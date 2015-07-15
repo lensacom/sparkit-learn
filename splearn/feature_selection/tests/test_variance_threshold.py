@@ -14,10 +14,10 @@ class TestVarianceThreshold(SplearnTestCase):
         local = VarianceThreshold()
         dist = SparkVarianceThreshold()
 
-        shapes = [((10, 5), None),
-                  ((1e3, 20), None),
+        shapes = [((10, 5), -1),
+                  ((1e3, 20), -1),
                   ((1e3, 20), 100),
-                  ((1e4, 100), None),
+                  ((1e4, 100), -1),
                   ((1e4, 100), 600)]
 
         for shape, block_size in shapes:

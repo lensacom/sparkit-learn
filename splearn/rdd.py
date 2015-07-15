@@ -126,8 +126,11 @@ class BlockRDD(object):
             raise TypeError(
                 "Unexpected type {0} for parameter rdd".format(type(rdd)))
 
-        self.dtype = dtype
+        if not isinstance(bsize, (int, long)):
+            raise TypeError("Block size parameter must be an integer!")
+
         self.bsize = bsize
+        self.dtype = dtype
 
     def _block(self, rdd, bsize, dtype):
         """Execute the blocking process on the given rdd.
@@ -711,6 +714,10 @@ class DictRDD(BlockRDD):
 
     def __contains__(self, key):
         return key in self.columns
+
+    def __len__(self):
+        """Returns the number of elements in all blocks."""
+        return self._rdd.map(lambda x: len(x[0])).sum()
 
     def unblock(self):
         """Flattens the blocks.

@@ -16,7 +16,7 @@ class TestGaussianRandomProjection(SplearnTestCase):
         local = GaussianRandomProjection(n_components=20, random_state=42)
         dist = SparkGaussianRandomProjection(n_components=20, random_state=42)
 
-        shapes = [((1e3, 50), None),
+        shapes = [((1e3, 50), -1),
                   ((1e4, 100), 600)]
 
         for shape, block_size in shapes:
@@ -64,7 +64,7 @@ class TestSparseRandomProjection(SplearnTestCase):
         local = SparseRandomProjection(n_components=20, random_state=42)
         dist = SparkSparseRandomProjection(n_components=20, random_state=42)
 
-        shapes = [((1e3, 50), None),
+        shapes = [((1e3, 50), -1),
                   ((1e4, 100), 600)]
 
         for shape, block_size in shapes:
