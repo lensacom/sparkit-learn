@@ -230,7 +230,7 @@ class TestArrayRDD(SplearnTestCase):
         rdd = self.sc.parallelize(data, n_partitions)
 
         assert_raises(TypeError, ArrayRDD, data)
-        assert_raises(TypeError, ArrayRDD, data, False)
+        assert_raises(TypeError, ArrayRDD, data, -1)
         assert_raises(TypeError, ArrayRDD, data, 10)
 
         assert_is_instance(ArrayRDD(rdd), ArrayRDD)
@@ -624,7 +624,7 @@ class TestDictRDD(SplearnTestCase):
         rdd = self.sc.parallelize(data, n_partitions)
 
         assert_raises(TypeError, DictRDD, data)
-        assert_raises(TypeError, DictRDD, data, bsize=False)
+        assert_raises(TypeError, DictRDD, data, bsize=-1)
         assert_raises(TypeError, DictRDD, data, bsize=10)
 
         assert_is_instance(DictRDD(rdd), DictRDD)
