@@ -235,7 +235,7 @@ class TestArrayRDD(SplearnTestCase):
 
         assert_is_instance(ArrayRDD(rdd), ArrayRDD)
         assert_is_instance(ArrayRDD(rdd, 10), ArrayRDD)
-        assert_is_instance(ArrayRDD(rdd, None), ArrayRDD)
+        assert_is_instance(ArrayRDD(rdd, -1), ArrayRDD)
 
     def test_partitions_number(self):
         data = np.arange(400).reshape((100, 4))
@@ -631,7 +631,7 @@ class TestDictRDD(SplearnTestCase):
         assert_is_instance(DictRDD(rdd), BlockRDD)
         assert_is_instance(DictRDD(rdd, bsize=10), DictRDD)
         assert_is_instance(DictRDD(rdd), BlockRDD)
-        assert_is_instance(DictRDD(rdd, bsize=None), DictRDD)
+        assert_is_instance(DictRDD(rdd, bsize=-1), DictRDD)
         assert_is_instance(DictRDD(rdd), BlockRDD)
 
     def test_creation_from_zipped_rdd(self):
