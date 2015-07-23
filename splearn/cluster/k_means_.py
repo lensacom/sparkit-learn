@@ -117,8 +117,8 @@ class SparkKMeans(KMeans):
         check_rdd(X, (np.ndarray, sp.spmatrix))
         if hasattr(self, '_mllib_model'):
             if isinstance(X, ArrayRDD):
-                X = X.tolist()
-            return self._mllib_model.predict(X)
+                X = X.unblock()
+            return X.map(lambda x: self._mllib_model.predict(x))
         else:
             rdd = X.map(lambda X: super(SparkKMeans, self).predict(X))
             return ArrayRDD(rdd)
