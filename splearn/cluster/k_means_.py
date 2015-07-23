@@ -5,11 +5,12 @@ import scipy.sparse as sp
 from pyspark.mllib.clustering import KMeans as MLlibKMeans
 from sklearn.cluster import KMeans
 
+from ..base import SparkTransformerMixin
 from ..rdd import ArrayRDD, DictRDD
 from ..utils.validation import check_rdd
 
 
-class SparkKMeans(KMeans):
+class SparkKMeans(KMeans, SparkTransformerMixin):
 
     """Distributed K-Means clustering
 
