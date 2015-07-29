@@ -126,8 +126,9 @@ class BlockRDD(object):
             raise TypeError(
                 "Unexpected type {0} for parameter rdd".format(type(rdd)))
 
-        if not isinstance(bsize, (int, long)):
-            raise TypeError("Block size parameter must be an integer!")
+        if bsize < 0 and bsize != -1:
+            raise TypeError("Block size parameter must be -1 or a positive"
+                            " integer!")
 
         self.bsize = bsize
         self.dtype = dtype
