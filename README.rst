@@ -443,6 +443,11 @@ Special thanks
 - spylearn community
 - pyspark community
 
+Similar Projects
+===============
+
+- `Thunder <https://github.com/thunder-project/thunder>`_
+- `Bolt <https://github.com/bolt-project/bolt>`_
 
 .. |Build Status| image:: https://travis-ci.org/lensacom/sparkit-learn.png?branch=master
    :target: https://travis-ci.org/lensacom/sparkit-learn
