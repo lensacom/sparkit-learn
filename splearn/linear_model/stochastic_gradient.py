@@ -2,7 +2,7 @@
 
 import numpy as np
 import scipy.sparse as sp
-from sklearn.linear_model import SklearnSGDClassifier
+from sklearn.linear_model import SGDClassifier as SklearnSGDClassifier
 
 from ..utils.validation import check_rdd
 from .base import LinearModelMixin
