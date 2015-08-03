@@ -1,12 +1,12 @@
 import numpy as np
-from sklearn.preprocessing import SklearnLabelEncoder
+from sklearn.preprocessing import LabelEncoder as SklearnLabelEncoder
 from sklearn.preprocessing.label import _check_numpy_unicode_bug
 from sklearn.utils import column_or_1d
 
 from ..base import BroadcasterMixin, TransformerMixin
 
 
-class SparkLabelEncoder(BroadcasterMixin, TransformerMixin, LabelEncoder):
+class LabelEncoder(BroadcasterMixin, TransformerMixin, SklearnLabelEncoder):
 
     """Encode labels with value between 0 and n_classes-1.
     Read more in the :ref:`User Guide <preprocessing_targets>`.

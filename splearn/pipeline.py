@@ -6,11 +6,11 @@ import numpy as np
 import scipy.sparse as sp
 from sklearn.externals import six
 from sklearn.externals.joblib import Parallel, delayed
-from sklearn.pipeline import FeatureUnion, Pipeline, _name_estimators
+from sklearn.pipeline import FeatureUnion as SklearnFeatureUnion, Pipeline as SklearnPipeline, _name_estimators
 from splearn.rdd import ArrayRDD, DictRDD
 
 
-class SparkPipeline(Pipeline):
+class Pipeline(SklearnPipeline):
 
     """Distributed implementation of sklearn's pipeline node.
 
@@ -131,14 +131,14 @@ class SparkPipeline(Pipeline):
 
     def get_params(self, deep=True):
         if not deep:
-            return super(SparkPipeline, self).get_params(deep=False)
+            return super(Pipeline, self).get_params(deep=False)
         else:
             out = self.named_steps.copy()
             for name, step in six.iteritems(self.named_steps):
                 for key, value in six.iteritems(step.get_params(deep=True)):
                     out['%s__%s' % (name, key)] = value
 
-            out.update(super(SparkPipeline, self).get_params(deep=False))
+            out.update(super(Pipeline, self).get_params(deep=False))
             return out
 
 ################################################################################
@@ -184,7 +184,7 @@ def _fit_transform_one(transformer, name, Z, transformer_weights,
         return Z_transformed, transformer
 
 
-class SparkFeatureUnion(FeatureUnion):
+class FeatureUnion(SklearnFeatureUnion):
 
     """TODO: rewrite docstring
     Concatenates results of multiple transformer objects.
@@ -268,13 +268,13 @@ class SparkFeatureUnion(FeatureUnion):
 
     def get_params(self, deep=True):
         if not deep:
-            return super(SparkFeatureUnion, self).get_params(deep=False)
+            return super(FeatureUnion, self).get_params(deep=False)
         else:
             out = dict(self.transformer_list)
             for name, trans in self.transformer_list:
                 for key, value in six.iteritems(trans.get_params(deep=True)):
                     out['%s__%s' % (name, key)] = value
-            out.update(super(SparkFeatureUnion, self).get_params(deep=False))
+            out.update(super(FeatureUnion, self).get_params(deep=False))
             return out
 
 
@@ -299,4 +299,4 @@ def make_sparkunion(*transformers):
     -------
     f : FeatureUnion
     """
-    return SparkFeatureUnion(_name_estimators(transformers))
+    return FeatureUnion(_name_estimators(transformers))
