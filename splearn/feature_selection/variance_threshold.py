@@ -1,15 +1,16 @@
 import numpy as np
 import scipy.sparse as sp
-from sklearn.feature_selection import VarianceThreshold
+from sklearn.feature_selection import \
+    VarianceThreshold as SklearnVarianceThreshold
 from sklearn.utils import check_array
 from sklearn.utils.sparsefuncs import mean_variance_axis
 
 from ..rdd import DictRDD
 from ..utils.validation import check_rdd
-from .base import SparkSelectorMixin
+from .base import SelectorMixin
 
 
-class SparkVarianceThreshold(VarianceThreshold, SparkSelectorMixin):
+class VarianceThreshold(SelectorMixin, SklearnVarianceThreshold):
 
     """Feature selector that removes all low-variance features.
 
@@ -43,7 +44,7 @@ class SparkVarianceThreshold(VarianceThreshold, SparkSelectorMixin):
 
     __transient__ = ['variances_']
 
-    def fit(self, Z):
+    def spark_fit(self, Z):
         """Learn empirical variances from X.
 
         Parameters
@@ -91,23 +92,3 @@ class SparkVarianceThreshold(VarianceThreshold, SparkSelectorMixin):
             raise ValueError(msg.format(self.threshold))
 
         return self
-
-    def transform(self, Z):
-        """Reduce X to the selected features.
-
-        Parameters
-        ----------
-        X : array of shape [n_samples, n_features]
-            The input samples.
-
-        Returns
-        -------
-        X_r : array of shape [n_samples, n_selected_features]
-            The input samples with only the selected features.
-        """
-        X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
-        check_rdd(X, (np.ndarray, sp.spmatrix))
-
-        mapper = self.broadcast(
-            super(SparkVarianceThreshold, self).transform, Z.context)
-        return Z.transform(mapper, column='X')

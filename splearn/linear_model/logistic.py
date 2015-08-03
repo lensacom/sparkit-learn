@@ -114,7 +114,7 @@ class SparkLogisticRegression(LogisticRegression, SparkLinearModelMixin):
     def classes_(self, value):
         pass
 
-    def fit(self, Z, classes=None):
+    def spark_fit(self, Z, classes=None):
         """Fit the model according to the given training data.
 
         Parameters
@@ -136,7 +136,7 @@ class SparkLogisticRegression(LogisticRegression, SparkLinearModelMixin):
         self._classes_ = np.unique(classes)
         return self._average_fit(SparkLogisticRegression, Z)
 
-    def predict(self, X):
+    def spark_predict(self, X):
         """Distributed method to predict class labels for samples in X.
 
         Parameters

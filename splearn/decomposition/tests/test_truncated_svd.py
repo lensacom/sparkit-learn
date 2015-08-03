@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.linalg as ln
-from sklearn.decomposition import TruncatedSVD
-from splearn.decomposition import SparkTruncatedSVD
+from sklearn.decomposition import TruncatedSVD as SklearnTruncatedSVD
+from splearn.decomposition import TruncatedSVD
 from splearn.decomposition.truncated_svd import svd, svd_em
 from splearn.utils.testing import (SplearnTestCase, assert_array_almost_equal,
                                    assert_array_equal, assert_true)
@@ -63,10 +63,10 @@ class TestTruncatedSVD(SplearnTestCase):
         n_components = 2
         random_state = 42
         tol = 1e-7
-        local = TruncatedSVD(n_components, n_iter=5, tol=tol,
-                             random_state=random_state)
-        dist = SparkTruncatedSVD(n_components, n_iter=50, tol=tol,
-                                 random_state=random_state)
+        local = SklearnTruncatedSVD(n_components, n_iter=5, tol=tol,
+                                    random_state=random_state)
+        dist = TruncatedSVD(n_components, n_iter=50, tol=tol,
+                            random_state=random_state)
 
         local.fit(X)
         dist.fit(X_rdd)
@@ -84,10 +84,10 @@ class TestTruncatedSVD(SplearnTestCase):
         n_components = 4
         random_state = 42
         tol = 1e-7
-        local = TruncatedSVD(n_components, n_iter=5, tol=tol,
-                             random_state=random_state)
-        dist = SparkTruncatedSVD(n_components, n_iter=50, tol=tol,
-                                 random_state=random_state)
+        local = SklearnTruncatedSVD(n_components, n_iter=5, tol=tol,
+                                    random_state=random_state)
+        dist = TruncatedSVD(n_components, n_iter=50, tol=tol,
+                            random_state=random_state)
 
         Z_local = local.fit_transform(X)
         Z_dist = dist.fit_transform(X_rdd)

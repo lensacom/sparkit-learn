@@ -1,6 +1,6 @@
 # encoding: utf-8
 
-from .text import SparkCountVectorizer
-from .text import SparkHashingVectorizer
-from .text import SparkTfidfTransformer
-from .dict_vectorizer import SparkDictVectorizer
+from .text import CountVectorizer
+from .text import HashingVectorizer
+from .text import TfidfTransformer
+from .dict_vectorizer import DictVectorizer

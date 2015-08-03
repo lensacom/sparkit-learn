@@ -3,12 +3,12 @@
 import numpy as np
 import scipy.sparse as sp
 from sklearn.svm import LinearSVC
-from splearn.linear_model.base import SparkLinearModelMixin
-
+from ..linear_model.base import LinearModelMixin
+from ..base import BroadcasterMixin, TransformerMixin
 from ..utils.validation import check_rdd
 
 
-class SparkLinearSVC(LinearSVC, SparkLinearModelMixin):
+class SparkLinearSVC(BroadcasterMixin, TransformerMixin, LinearModelMixin, LinearSVC):
 
     """Distributed version of sklearn's Linear Support Vector Classification.
 
@@ -98,7 +98,7 @@ class SparkLinearSVC(LinearSVC, SparkLinearModelMixin):
     def classes_(self, value):
         pass
 
-    def fit(self, Z, classes=None):
+    def spark_fit(self, Z, classes=None):
         """Fit the model according to the given training data.
 
         Parameters
@@ -119,7 +119,7 @@ class SparkLinearSVC(LinearSVC, SparkLinearModelMixin):
 
         return self._average_fit(SparkLinearSVC, Z)
 
-    def predict(self, X):
+    def spark_predict(self, X):
         """Distributed method to predict class labels for samples in X.
 
         Parameters

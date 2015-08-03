@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 
-from sklearn.base import BaseEstimator, ClassifierMixin, TransformerMixin
+from sklearn.base import BaseEstimator as SklearnBaseEstimator
+from sklearn.base import ClassifierMixin as SklearnClassifierMixin
+from sklearn.base import TransformerMixin as SklearnTransformerMixin
 from sklearn.metrics import accuracy_score
 
+from .rdd import BlockRDD, DictRDD
 
-class SparkBroadcasterMixin(object):
+
+class BroadcasterMixin(object):
 
     # TODO: consider caching in case of streaming
     def broadcast(self, func, context):
@@ -18,11 +22,11 @@ class SparkBroadcasterMixin(object):
         return func_wrapper
 
 
-class SparkBaseEstimator(BaseEstimator):
+class BaseEstimator(SklearnBaseEstimator):
     pass
 
 
-class SparkClassifierMixin(ClassifierMixin):
+class ClassifierMixin(SklearnClassifierMixin):
 
     """Mixin class for all classifiers in sparkit-learn."""
 
@@ -35,11 +39,30 @@ class SparkClassifierMixin(ClassifierMixin):
                               sample_weight=w)
 
 
-class SparkTransformerMixin(TransformerMixin):
+class TransformerMixin(SklearnTransformerMixin):
 
     """Mixin class for all transformers in sparkit-learn."""
 
-    def fit_transform(self, Z, **fit_params):
+    def fit(self, X, y=None, **fit_params):
+        if isinstance(X, BlockRDD):
+            return self.spark_fit(X, **fit_params)
+        else:
+            return super(TransformerMixin, self).fit(X, y, **fit_params)
+
+    def transform(self, X):
+        if isinstance(X, BlockRDD):
+            return self.spark_transform(X)
+        else:
+            return super(TransformerMixin, self).transform(X)
+
+    def fit_transform(self, X, y=None, **fit_params):
+        if isinstance(X, BlockRDD):
+            return self.spark_fit_transform(X, **fit_params)
+        else:
+            return super(TransformerMixin, self).fit_transform(
+                X, y, **fit_params)
+
+    def spark_fit_transform(self, Z, **fit_params):
         """Fit to data, then transform it.
 
         Fits transformer to Z with optional parameters fit_params
@@ -58,4 +81,4 @@ class SparkTransformerMixin(TransformerMixin):
         """
         # non-optimized default implementation; override when a better
         # method is possible
-        return self.fit(Z, **fit_params).transform(Z)
+        return self.spark_fit(Z, **fit_params).spark_transform(Z)

@@ -1,11 +1,14 @@
 import numpy as np
 import scipy.sparse as sp
-from sklearn.feature_extraction.text import (CountVectorizer,
+from sklearn.feature_extraction.text import \
+    CountVectorizer as SklearnCountVectorizer
+from sklearn.feature_extraction.text import \
+    HashingVectorizer as SklearnHashingVectorizer
+from sklearn.feature_extraction.text import \
+    TfidfTransformer as SklearnTfidfTransformer
+from splearn.feature_extraction.text import (CountVectorizer,
                                              HashingVectorizer,
                                              TfidfTransformer)
-from splearn.feature_extraction.text import (SparkCountVectorizer,
-                                             SparkHashingVectorizer,
-                                             SparkTfidfTransformer)
 from splearn.utils.testing import (SplearnTestCase, assert_array_almost_equal,
                                    assert_array_equal, assert_equal,
                                    assert_true)
@@ -16,8 +19,8 @@ class TestCountVectorizer(SplearnTestCase):
 
     def test_same_output(self):
         X, X_rdd = self.make_text_rdd()
-        local = CountVectorizer()
-        dist = SparkCountVectorizer()
+        local = SklearnCountVectorizer()
+        dist = CountVectorizer()
 
         result_local = local.fit_transform(X).toarray()
         result_dist = dist.fit_transform(X_rdd).toarray()
@@ -34,8 +37,8 @@ class TestCountVectorizer(SplearnTestCase):
                   {'min_df': 2, 'max_features': 3}]
 
         for paramset in params:
-            local = CountVectorizer(**paramset)
-            dist = SparkCountVectorizer(**paramset)
+            local = SklearnCountVectorizer(**paramset)
+            dist = CountVectorizer(**paramset)
 
             result_local = local.fit_transform(X).toarray()
             result_dist = dist.fit_transform(X_rdd).toarray()
@@ -51,8 +54,8 @@ class TestHashingVectorizer(SplearnTestCase):
 
     def test_same_output(self):
         X, X_rdd = self.make_text_rdd()
-        local = HashingVectorizer()
-        dist = SparkHashingVectorizer()
+        local = SklearnHashingVectorizer()
+        dist = HashingVectorizer()
 
         result_local = local.transform(X).toarray()
         result_dist = dist.transform(X_rdd).toarray()
@@ -66,8 +69,8 @@ class TestHashingVectorizer(SplearnTestCase):
         X = list(map(splitter, X))
         X_rdd = X_rdd.map(lambda x: list(map(splitter, x)))
 
-        local = HashingVectorizer(analyzer=lambda x: x)
-        dist = SparkHashingVectorizer(analyzer=lambda x: x)
+        local = SklearnHashingVectorizer(analyzer=lambda x: x)
+        dist = HashingVectorizer(analyzer=lambda x: x)
 
         result_local = local.transform(X).toarray()
         result_dist = dist.transform(X_rdd).toarray()
@@ -84,8 +87,8 @@ class TestTfidfTransformer(SplearnTestCase):
         X, y, Z_rdd = self.make_classification(4, 1000, -1)
         X_rdd = Z_rdd[:, 'X']
 
-        local = TfidfTransformer()
-        dist = SparkTfidfTransformer()
+        local = SklearnTfidfTransformer()
+        dist = TfidfTransformer()
 
         Z_local = local.fit_transform(X)
         Z_dist = dist.fit_transform(X_rdd)

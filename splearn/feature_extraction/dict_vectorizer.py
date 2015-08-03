@@ -4,14 +4,14 @@ import numpy as np
 import scipy.sparse as sp
 from pyspark import AccumulatorParam
 from sklearn.externals import six
-from sklearn.feature_extraction import DictVectorizer
+from sklearn.feature_extraction import DictVectorizer as SklearnDictVectorizer
 
-from ..base import SparkBroadcasterMixin
+from ..base import BroadcasterMixin, TransformerMixin
 from ..rdd import DictRDD
 from ..utils.validation import check_rdd
 
 
-class SparkDictVectorizer(DictVectorizer, SparkBroadcasterMixin):
+class DictVectorizer(BroadcasterMixin, TransformerMixin, SklearnDictVectorizer):
 
     """Transforms DictRDDs containing feature-value mappings to vectors.
     This transformer turns lists of mappings (dict-like objects) of feature
@@ -73,7 +73,7 @@ class SparkDictVectorizer(DictVectorizer, SparkBroadcasterMixin):
 
     __transient__ = ['feature_names_', 'vocabulary_']
 
-    def fit(self, Z):
+    def spark_fit(self, Z):
         """Learn a list of feature name -> indices mappings.
 
         Parameters
@@ -123,7 +123,7 @@ class SparkDictVectorizer(DictVectorizer, SparkBroadcasterMixin):
 
         return self
 
-    def transform(self, Z):
+    def spark_transform(self, Z):
         """Transform ArrayRDD's (or DictRDD's 'X' column's) feature->value dicts
         to array or sparse matrix.
         Named features not encountered during fit or fit_transform will be
@@ -141,25 +141,7 @@ class SparkDictVectorizer(DictVectorizer, SparkBroadcasterMixin):
         Z : transformed, containing {array, sparse matrix}
             Feature vectors; always 2-d.
         """
-        mapper = self.broadcast(super(SparkDictVectorizer, self).transform,
-                                Z.context)
+        mapper = self.broadcast(
+            super(DictVectorizer, self).transform, Z.context)
         dtype = sp.spmatrix if self.sparse else np.ndarray
         return Z.transform(mapper, column='X', dtype=dtype)
-
-    def fit_transform(self, Z):
-        """Learn a list of feature name -> indices mappings and transform Z.
-        Like fit(Z) followed by transform(Z).
-
-        Parameters
-        ----------
-        Z : Z : ArrayRDD or DictRDD with column 'X' containing Mapping or
-            iterable over Mappings
-            Dict(s) or Mapping(s) from feature names (arbitrary Python
-            objects) to feature values (strings or convertible to dtype).
-
-        Returns
-        -------
-        Z : transformed, containing {array, sparse matrix}
-            Feature vectors; always 2-d.
-        """
-        return self.fit(Z).transform(Z)

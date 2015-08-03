@@ -1,9 +1,11 @@
 import numpy as np
 import scipy.sparse as sp
-from sklearn.random_projection import (GaussianRandomProjection,
+from sklearn.random_projection import \
+    GaussianRandomProjection as SklearnGaussianRandomProjection
+from sklearn.random_projection import \
+    SparseRandomProjection as SklearnSparseRandomProjection
+from splearn.random_projection import (GaussianRandomProjection,
                                        SparseRandomProjection)
-from splearn.random_projection import (SparkGaussianRandomProjection,
-                                       SparkSparseRandomProjection)
 from splearn.rdd import DictRDD
 from splearn.utils.testing import (SplearnTestCase, assert_array_almost_equal,
                                    assert_true)
@@ -12,9 +14,10 @@ from splearn.utils.validation import check_rdd_dtype
 
 class TestGaussianRandomProjection(SplearnTestCase):
 
-    def test_same_components(self):
-        local = GaussianRandomProjection(n_components=20, random_state=42)
-        dist = SparkGaussianRandomProjection(n_components=20, random_state=42)
+    def test_state(self):
+        scikit = SklearnGaussianRandomProjection(n_components=20,
+                                                 random_state=42)
+        sparkit = GaussianRandomProjection(n_components=20, random_state=42)
 
         shapes = [((1e3, 50), -1),
                   ((1e4, 100), 600)]
@@ -24,45 +27,73 @@ class TestGaussianRandomProjection(SplearnTestCase):
             X_sparse, X_sparse_rdd = self.make_sparse_rdd(shape, block_size)
             Z = DictRDD([X_sparse_rdd, X_dense_rdd], columns=('X', 'Y'))
 
-            local.fit(X_dense)
-            dist.fit(X_dense_rdd)
-            assert_array_almost_equal(local.components_, dist.components_)
+            scikit.fit(X_dense)
+            sparkit.fit(X_dense)
+            assert_array_almost_equal(scikit.components_, sparkit.components_)
+            sparkit.fit(X_dense_rdd)
+            assert_array_almost_equal(scikit.components_, sparkit.components_)
 
-            local.fit(X_sparse)
-            dist.fit(X_sparse_rdd)
-            assert_array_almost_equal(local.components_, dist.components_)
+            scikit.fit(X_sparse)
+            sparkit.fit(X_sparse)
+            assert_array_almost_equal(scikit.components_, sparkit.components_)
+            sparkit.fit(X_sparse_rdd)
+            assert_array_almost_equal(scikit.components_, sparkit.components_)
 
-            dist.fit(Z)
-            assert_array_almost_equal(local.components_, dist.components_)
+            sparkit.fit(Z)
+            assert_array_almost_equal(scikit.components_, sparkit.components_)
 
-    def test_same_transform_result(self):
-        local = GaussianRandomProjection(n_components=4, random_state=42)
-        dist = SparkGaussianRandomProjection(n_components=4, random_state=42)
+    def test_dense(self):
+        X_dense, X_dense_rdd = self.make_dense_rdd()
 
+        scikit = SklearnGaussianRandomProjection(n_components=4,
+                                                 random_state=42)
+        sparkit = GaussianRandomProjection(n_components=4, random_state=42)
+
+        T_scikit = scikit.fit_transform(X_dense)
+
+        T_sparkit = sparkit.fit_transform(X_dense)
+        assert_array_almost_equal(T_scikit, T_sparkit)
+
+        T_sparkit = sparkit.fit_transform(X_dense_rdd)
+        assert_true(check_rdd_dtype(T_sparkit, (np.ndarray,)))
+        assert_array_almost_equal(T_scikit, T_sparkit.toarray())
+
+    def test_sparse(self):
+        X_sparse, X_sparse_rdd = self.make_sparse_rdd()
+
+        scikit = SklearnGaussianRandomProjection(n_components=4,
+                                                 random_state=42)
+        sparkit = GaussianRandomProjection(n_components=4, random_state=42)
+
+        T_scikit = scikit.fit_transform(X_sparse)
+
+        T_sparkit = sparkit.fit_transform(X_sparse)
+        assert_array_almost_equal(T_scikit, T_sparkit)
+
+        T_sparkit = sparkit.fit_transform(X_sparse_rdd)
+        assert_true(check_rdd_dtype(T_sparkit, (np.ndarray,)))
+        assert_array_almost_equal(T_scikit, T_sparkit.toarray())
+
+    def test_dict(self):
         X_dense, X_dense_rdd = self.make_dense_rdd()
         X_sparse, X_sparse_rdd = self.make_sparse_rdd()
         Z_rdd = DictRDD([X_sparse_rdd, X_dense_rdd], columns=('X', 'Y'))
 
-        result_local = local.fit_transform(X_dense)
-        result_dist = dist.fit_transform(X_dense_rdd)
-        assert_true(check_rdd_dtype(result_dist, (np.ndarray,)))
-        assert_array_almost_equal(result_local, result_dist.toarray())
+        scikit = SklearnGaussianRandomProjection(n_components=4,
+                                                 random_state=42)
+        sparkit = GaussianRandomProjection(n_components=4, random_state=42)
 
-        result_local = local.fit_transform(X_sparse)
-        result_dist = dist.fit_transform(X_sparse_rdd)
-        assert_true(check_rdd_dtype(result_dist, (np.ndarray,)))
-        assert_array_almost_equal(result_local, result_dist.toarray())
-
-        result_dist = dist.fit_transform(Z_rdd)[:, 'X']
-        assert_true(check_rdd_dtype(result_dist, (np.ndarray,)))
-        assert_array_almost_equal(result_local, result_dist.toarray())
+        T_scikit = scikit.fit_transform(X_sparse)
+        T_sparkit = sparkit.fit_transform(Z_rdd)[:, 'X']
+        assert_true(check_rdd_dtype(T_sparkit, (np.ndarray,)))
+        assert_array_almost_equal(T_scikit, T_sparkit.toarray())
 
 
 class TestSparseRandomProjection(SplearnTestCase):
 
-    def test_same_components(self):
-        local = SparseRandomProjection(n_components=20, random_state=42)
-        dist = SparkSparseRandomProjection(n_components=20, random_state=42)
+    def test_state(self):
+        scikit = SklearnSparseRandomProjection(n_components=20, random_state=42)
+        sparkit = SparseRandomProjection(n_components=20, random_state=42)
 
         shapes = [((1e3, 50), -1),
                   ((1e4, 100), 600)]
@@ -72,38 +103,66 @@ class TestSparseRandomProjection(SplearnTestCase):
             X_sparse, X_sparse_rdd = self.make_sparse_rdd(shape, block_size)
             Z = DictRDD([X_sparse_rdd, X_dense_rdd], columns=('X', 'Y'))
 
-            local.fit(X_dense)
-            dist.fit(X_dense_rdd)
-            assert_array_almost_equal(local.components_.toarray(),
-                                      dist.components_.toarray())
+            scikit.fit(X_dense)
+            sparkit.fit(X_dense)
+            assert_array_almost_equal(scikit.components_.toarray(),
+                                      sparkit.components_.toarray())
+            sparkit.fit(X_dense_rdd)
+            assert_array_almost_equal(scikit.components_.toarray(),
+                                      sparkit.components_.toarray())
 
-            local.fit(X_sparse)
-            dist.fit(X_sparse_rdd)
-            assert_array_almost_equal(local.components_.toarray(),
-                                      dist.components_.toarray())
+            scikit.fit(X_sparse)
+            sparkit.fit(X_sparse)
+            assert_array_almost_equal(scikit.components_.toarray(),
+                                      sparkit.components_.toarray())
+            sparkit.fit(X_sparse_rdd)
+            assert_array_almost_equal(scikit.components_.toarray(),
+                                      sparkit.components_.toarray())
 
-            dist.fit(Z)
-            assert_array_almost_equal(local.components_.toarray(),
-                                      dist.components_.toarray())
+            sparkit.fit(Z)
+            assert_array_almost_equal(scikit.components_.toarray(),
+                                      sparkit.components_.toarray())
 
-    def test_same_transform_result(self):
-        local = SparseRandomProjection(n_components=4, random_state=42)
-        dist = SparkSparseRandomProjection(n_components=4, random_state=42)
+    def test_dense(self):
+        X_dense, X_dense_rdd = self.make_dense_rdd()
 
+        scikit = SklearnSparseRandomProjection(n_components=4, random_state=42)
+        sparkit = SparseRandomProjection(n_components=4, random_state=42)
+
+        T_scikit = scikit.fit_transform(X_dense)
+
+        T_sparkit = sparkit.fit_transform(X_dense)
+        assert_array_almost_equal(T_scikit, T_sparkit)
+
+        T_sparkit = sparkit.fit_transform(X_dense_rdd)
+        assert_true(check_rdd_dtype(T_sparkit, (np.ndarray,)))
+        assert_array_almost_equal(T_scikit, T_sparkit.toarray())
+
+    def test_sparse(self):
+        X_sparse, X_sparse_rdd = self.make_sparse_rdd()
+
+        scikit = SklearnSparseRandomProjection(n_components=4, random_state=42)
+        sparkit = SparseRandomProjection(n_components=4, random_state=42)
+
+        T_scikit = scikit.fit_transform(X_sparse)
+
+        T_sparkit = sparkit.fit_transform(X_sparse)
+        assert_true(sp.issparse(T_sparkit))
+        assert_array_almost_equal(T_scikit.toarray(), T_sparkit.toarray())
+
+        T_sparkit = sparkit.fit_transform(X_sparse_rdd)
+        assert_true(check_rdd_dtype(T_sparkit, (sp.spmatrix,)))
+        assert_array_almost_equal(T_scikit.toarray(), T_sparkit.toarray())
+
+    def test_dict(self):
         X_dense, X_dense_rdd = self.make_dense_rdd()
         X_sparse, X_sparse_rdd = self.make_sparse_rdd()
         Z_rdd = DictRDD([X_sparse_rdd, X_dense_rdd], columns=('X', 'Y'))
 
-        result_local = local.fit_transform(X_dense)
-        result_dist = dist.fit_transform(X_dense_rdd)
-        assert_true(check_rdd_dtype(result_dist, (np.ndarray,)))
-        assert_array_almost_equal(result_local, result_dist.toarray())
+        scikit = SklearnSparseRandomProjection(n_components=4, random_state=42)
+        sparkit = SparseRandomProjection(n_components=4, random_state=42)
 
-        result_local = local.fit_transform(X_sparse)
-        result_dist = dist.fit_transform(X_sparse_rdd)
-        assert_true(check_rdd_dtype(result_dist, (sp.spmatrix,)))
-        assert_array_almost_equal(result_local.toarray(), result_dist.toarray())
-
-        result_dist = dist.fit_transform(Z_rdd)[:, 'X']
-        assert_true(check_rdd_dtype(result_dist, (sp.spmatrix,)))
-        assert_array_almost_equal(result_local.toarray(), result_dist.toarray())
+        T_scikit = scikit.fit_transform(X_sparse)
+        T_sparkit = sparkit.fit_transform(Z_rdd)[:, 'X']
+        assert_true(check_rdd_dtype(T_sparkit, (sp.spmatrix,)))
+        assert_array_almost_equal(T_scikit.toarray(), T_sparkit.toarray())

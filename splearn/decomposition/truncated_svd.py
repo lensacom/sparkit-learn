@@ -4,10 +4,10 @@ import numpy as np
 import scipy.linalg as ln
 import scipy.sparse as sp
 # from pyspark import AccumulatorParam
-from sklearn.decomposition import TruncatedSVD
+from sklearn.decomposition import TruncatedSVD as SklearnTruncatedSVD
 from sklearn.utils.extmath import safe_sparse_dot
 
-from ..base import SparkBroadcasterMixin
+from ..base import BroadcasterMixin, TransformerMixin
 from ..rdd import DictRDD
 from ..utils.validation import check_rdd
 
@@ -170,7 +170,7 @@ def svd_em(blocked_rdd, k, maxiter=20, tol=1e-6, compute_u=True, seed=None):
         return s, v
 
 
-class SparkTruncatedSVD(TruncatedSVD, SparkBroadcasterMixin):
+class TruncatedSVD(BroadcasterMixin, TransformerMixin, SklearnTruncatedSVD):
 
     """Dimensionality reduction using truncated SVD (aka LSA).
 
@@ -260,11 +260,11 @@ class SparkTruncatedSVD(TruncatedSVD, SparkBroadcasterMixin):
 
     def __init__(self, n_components=2, algorithm="em", n_iter=30,
                  random_state=None, tol=1e-7):
-        super(SparkTruncatedSVD, self).__init__(
+        super(TruncatedSVD, self).__init__(
             n_components=n_components, algorithm=algorithm,
             n_iter=n_iter, random_state=random_state, tol=tol)
 
-    def fit(self, Z):
+    def spark_fit(self, Z):
         """Fit LSI model on training data X.
 
         Parameters
@@ -277,10 +277,10 @@ class SparkTruncatedSVD(TruncatedSVD, SparkBroadcasterMixin):
         self : object
             Returns the transformer object.
         """
-        self.fit_transform(Z)
+        self.spark_fit_transform(Z)
         return self
 
-    def fit_transform(self, Z):
+    def spark_fit_transform(self, Z):
         """Fit LSI model to X and perform dimensionality reduction on X.
 
         Parameters
@@ -302,12 +302,12 @@ class SparkTruncatedSVD(TruncatedSVD, SparkBroadcasterMixin):
                               seed=self.random_state)
             self.components_ = V
             X.unpersist()
-            return self.transform(Z)
+            return self.spark_transform(Z)
         else:
-            # TODO: raise warning non distributed
-            return super(SparkTruncatedSVD, self).fit_transform(X.tosparse())
+            raise ValueError("TruncatedSVD on Spark only supports Expectation"
+                             " Maximization (EM) algorithm.")
 
-    def transform(self, Z):
+    def spark_transform(self, Z):
         """Perform dimensionality reduction on X.
 
         Parameters
@@ -324,10 +324,10 @@ class SparkTruncatedSVD(TruncatedSVD, SparkBroadcasterMixin):
         check_rdd(X, (sp.spmatrix, np.ndarray))
 
         mapper = self.broadcast(
-            super(SparkTruncatedSVD, self).transform, Z.context)
+            super(TruncatedSVD, self).transform, Z.context)
         return Z.transform(mapper, column='X', dtype=np.ndarray)
 
-    def inverse_transform(self, Z):
+    def spark_inverse_transform(self, Z):
         """Transform X back to its original space.
 
         Returns an array X_original whose transform would be X.
@@ -346,5 +346,5 @@ class SparkTruncatedSVD(TruncatedSVD, SparkBroadcasterMixin):
         check_rdd(X, (sp.spmatrix, np.ndarray))
 
         mapper = self.broadcast(
-            super(SparkTruncatedSVD, self).inverse_transform, Z.context)
+            super(TruncatedSVD, self).inverse_transform, Z.context)
         return Z.transform(mapper, column='X', dtype=np.ndarray)

@@ -3,15 +3,20 @@
 
 from abc import ABCMeta
 
+import numpy as np
+import scipy.sparse as sp
 from sklearn.externals import six
-from sklearn.feature_selection.base import SelectorMixin
+from sklearn.feature_selection.base import \
+    SelectorMixin as SklearnSelectorMixin
 
-from ..base import SparkBroadcasterMixin, SparkTransformerMixin
+from ..base import BroadcasterMixin, TransformerMixin
+from ..rdd import DictRDD
+from ..utils.validation import check_rdd
 
 
-class SparkSelectorMixin(six.with_metaclass(ABCMeta, SelectorMixin,
-                                            SparkTransformerMixin,
-                                            SparkBroadcasterMixin)):
+class SelectorMixin(six.with_metaclass(ABCMeta, BroadcasterMixin,
+                                       TransformerMixin,
+                                       SklearnSelectorMixin)):
 
     """
     Tranformer mixin that performs feature selection given a support mask
@@ -21,4 +26,22 @@ class SparkSelectorMixin(six.with_metaclass(ABCMeta, SelectorMixin,
     `_get_support_mask`.
     """
 
-    pass
+    def spark_transform(self, Z):
+        """Reduce X to the selected features.
+
+        Parameters
+        ----------
+        X : array of shape [n_samples, n_features]
+            The input samples.
+
+        Returns
+        -------
+        X_r : array of shape [n_samples, n_selected_features]
+            The input samples with only the selected features.
+        """
+        X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
+        check_rdd(X, (np.ndarray, sp.spmatrix))
+
+        mapper = self.broadcast(
+            super(SelectorMixin, self).transform, Z.context)
+        return Z.transform(mapper, column='X')

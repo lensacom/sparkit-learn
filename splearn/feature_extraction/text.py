@@ -8,20 +8,23 @@ import numpy as np
 import scipy.sparse as sp
 import six
 from pyspark import AccumulatorParam
-from sklearn.feature_extraction.text import (CountVectorizer,
-                                             HashingVectorizer,
-                                             TfidfTransformer,
-                                             _document_frequency,
+from sklearn.feature_extraction.text import \
+    CountVectorizer as SklearnCountVectorizer
+from sklearn.feature_extraction.text import \
+    HashingVectorizer as SklearnHashingVectorizer
+from sklearn.feature_extraction.text import \
+    TfidfTransformer as SklearnTfidfTransformer
+from sklearn.feature_extraction.text import (_document_frequency,
                                              _make_int_array)
 from sklearn.utils.fixes import frombuffer_empty
 from sklearn.utils.validation import check_is_fitted
 
-from ..base import SparkBroadcasterMixin
+from ..base import BroadcasterMixin, TransformerMixin
 from ..rdd import DictRDD
 from ..utils.validation import check_rdd
 
 
-class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
+class CountVectorizer(BroadcasterMixin, TransformerMixin, SklearnCountVectorizer):
 
     """Distributed implementation of CountVectorizer.
 
@@ -136,7 +139,7 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
 
     __transient__ = ['vocabulary_']
 
-    def _init_vocab(self, analyzed_docs):
+    def _spark_init_vocab(self, analyzed_docs):
         """Create vocabulary
         """
         class SetAccum(AccumulatorParam):
@@ -161,7 +164,7 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
                              " contain stop words")
         return vocabulary
 
-    def _count_vocab(self, analyzed_docs):
+    def _spark_count_vocab(self, analyzed_docs):
         """Create sparse feature matrix, and vocabulary where fixed_vocab=False
         """
         vocabulary = self.vocabulary_
@@ -191,7 +194,7 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
 
         return X
 
-    def _sort_features(self, vocabulary):
+    def _spark_sort_features(self, vocabulary):
         """Sort features by name
 
         Returns a reordered matrix and modifies the vocabulary in place
@@ -204,8 +207,8 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
 
         return map_index
 
-    def _limit_features(self, X, vocabulary, high=None, low=None,
-                        limit=None):
+    def _spark_limit_features(self, X, vocabulary, high=None, low=None,
+                              limit=None):
         """Remove too rare or too common features.
 
         Prune features that are non zero in more samples than high or less
@@ -247,7 +250,7 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
 
         return kept_indices, removed_terms
 
-    def fit(self, Z):
+    def spark_fit(self, Z):
         """Learn a vocabulary dictionary of all tokens in the raw documents in
         the DictRDD's 'X' column.
 
@@ -264,7 +267,7 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
         self.fit_transform(Z)
         return self
 
-    def fit_transform(self, Z):
+    def spark_fit_transform(self, Z):
         """Learn the vocabulary dictionary and return term-document matrix.
 
         This is equivalent to fit followed by transform, but more efficiently
@@ -290,10 +293,10 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
 
         # create vocabulary
         X = A[:, 'X'] if isinstance(A, DictRDD) else A
-        self.vocabulary_ = self._init_vocab(X)
+        self.vocabulary_ = self._spark_init_vocab(X)
 
         # transform according to vocabulary
-        mapper = self.broadcast(self._count_vocab, A.context)
+        mapper = self.broadcast(self._spark_count_vocab, A.context)
         Z = A.transform(mapper, column='X', dtype=sp.spmatrix)
         Z = Z.persist()
         A.unpersist()
@@ -316,11 +319,11 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
             if max_doc_count < min_doc_count:
                 raise ValueError(
                     "max_df corresponds to < documents than min_df")
-            kept_indices, self.stop_words_ = self._limit_features(
+            kept_indices, self.stop_words_ = self._spark_limit_features(
                 X, self.vocabulary_, max_doc_count, min_doc_count, max_features)
 
             # sort features
-            map_index = self._sort_features(self.vocabulary_)
+            map_index = self._spark_sort_features(self.vocabulary_)
 
             # combined mask
             mask = kept_indices[map_index]
@@ -329,7 +332,7 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
 
         return Z
 
-    def transform(self, Z):
+    def spark_transform(self, Z):
         """Transform documents to document-term matrix.
 
         Extract token counts out of raw text documents using the vocabulary
@@ -351,7 +354,7 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
         self._check_vocabulary()
 
         analyze = self.build_analyzer()
-        mapper = self.broadcast(self._count_vocab, Z.context)
+        mapper = self.broadcast(self._spark_count_vocab, Z.context)
 
         Z = Z.transform(lambda X: list(map(analyze, X)), column='X') \
              .transform(mapper, column='X', dtype=sp.spmatrix)
@@ -359,7 +362,7 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
         return Z
 
 
-class SparkHashingVectorizer(HashingVectorizer):
+class HashingVectorizer(TransformerMixin, SklearnHashingVectorizer):
 
     """Distributed implementation of Hashingvectorizer.
 
@@ -467,7 +470,10 @@ class SparkHashingVectorizer(HashingVectorizer):
     CountVectorizer, TfidfVectorizer
     """
 
-    def transform(self, Z):
+    def spark_fit(self, Z):
+        return self
+
+    def spark_transform(self, Z):
         """Transform an ArrayRDD (or DictRDD with column 'X') containing
         sequence of documents to a document-term matrix.
 
@@ -482,13 +488,11 @@ class SparkHashingVectorizer(HashingVectorizer):
         Z : SparseRDD/DictRDD containg scipy.sparse matrix
             Document-term matrix.
         """
-        mapper = super(SparkHashingVectorizer, self).transform
+        mapper = super(HashingVectorizer, self).transform
         return Z.transform(mapper, column='X', dtype=sp.spmatrix)
 
-    fit_transform = transform
 
-
-class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
+class TfidfTransformer(BroadcasterMixin, TransformerMixin, SklearnTfidfTransformer):
 
     """Distributed implementation of TfidfTransformer.
 
@@ -538,7 +542,7 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
 
     __transient__ = ['_idf_diag']
 
-    def fit(self, Z):
+    def spark_fit(self, Z):
         """Learn the idf vector (global term weights)
 
         Parameters
@@ -575,7 +579,7 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
                                         diags=0, m=n_features, n=n_features)
         return self
 
-    def transform(self, Z):
+    def spark_transform(self, Z):
         """Transform an ArrayRDD (or DictRDD's 'X' column) containing count
         matrices to a tf or tf-idf representation
 
@@ -592,7 +596,7 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
         check_rdd(X, (sp.spmatrix, np.ndarray))
 
-        mapper = super(SparkTfidfTransformer, self).transform
+        mapper = super(TfidfTransformer, self).transform
 
         if self.use_idf:
             check_is_fitted(self, '_idf_diag', 'idf vector is not fitted')

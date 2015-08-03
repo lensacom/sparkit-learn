@@ -1,1 +1,1 @@
-from .label import SparkLabelEncoder
+from .label import LabelEncoder

@@ -1,2 +1,2 @@
 
-from .classes import SparkLinearSVC
+from .classes import LinearSVC

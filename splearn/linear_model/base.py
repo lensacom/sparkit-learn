@@ -3,13 +3,14 @@
 import numpy as np
 import scipy.sparse as sp
 from sklearn.base import copy
-from sklearn.linear_model.base import LinearRegression
-from splearn.base import SparkBroadcasterMixin
+from sklearn.linear_model.base import \
+    LinerRegression as SklearnLinearRegression
+from splearn.base import BroadcasterMixin
 
 from ..utils.validation import check_rdd
 
 
-class SparkLinearModelMixin(SparkBroadcasterMixin):
+class LinearModelMixin(object):
 
     __transient__ = ['coef_', 'intercept_']
 
@@ -80,16 +81,17 @@ class SparkLinearModelMixin(SparkBroadcasterMixin):
         -------
         self: the wrapped class
         """
-        mapper = lambda X_y: super(cls, self).fit(
-            X_y[0], X_y[1], *args, **kwargs
-        )
+        def mapper(X_y):
+            return super(cls, self).fit(X_y[0], X_y[1], *args, **kwargs)
+
         models = Z[:, ['X', 'y']].map(mapper)
         avg = models.sum() / models.count()
         self.__dict__.update(avg.__dict__)
         return self
 
 
-class SparkLinearRegression(LinearRegression, SparkLinearModelMixin):
+class LinearRegression(BroadcasterMixin, LinearModelMixin,
+                       SklearnLinearRegression):
 
     """Distributed implementation of sklearn's Linear Regression.
 
@@ -119,7 +121,7 @@ class SparkLinearRegression(LinearRegression, SparkLinearModelMixin):
 
     """
 
-    def fit(self, Z):
+    def spark_fit(self, Z):
         """
         Fit linear model.
 
@@ -134,9 +136,9 @@ class SparkLinearRegression(LinearRegression, SparkLinearModelMixin):
         self : returns an instance of self.
         """
         check_rdd(Z, {'X': (sp.spmatrix, np.ndarray)})
-        return self._average_fit(SparkLinearRegression, Z)
+        return self._average_fit(LinearRegression, Z)
 
-    def predict(self, X):
+    def spark_predict(self, X):
         """Distributed method to predict class labels for samples in X.
 
         Parameters
@@ -151,5 +153,5 @@ class SparkLinearRegression(LinearRegression, SparkLinearModelMixin):
         """
         check_rdd(X, (sp.spmatrix, np.ndarray))
         mapper = self.broadcast(
-            super(SparkLinearRegression, self).predict, X.context)
+            super(LinearRegression, self).predict, X.context)
         return X.transform(mapper, column='X')

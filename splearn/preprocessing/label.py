@@ -1,13 +1,12 @@
 import numpy as np
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import SklearnLabelEncoder
 from sklearn.preprocessing.label import _check_numpy_unicode_bug
 from sklearn.utils import column_or_1d
 
-from ..base import SparkBroadcasterMixin, SparkTransformerMixin
+from ..base import BroadcasterMixin, TransformerMixin
 
 
-class SparkLabelEncoder(LabelEncoder, SparkTransformerMixin,
-                        SparkBroadcasterMixin):
+class SparkLabelEncoder(BroadcasterMixin, TransformerMixin, LabelEncoder):
 
     """Encode labels with value between 0 and n_classes-1.
     Read more in the :ref:`User Guide <preprocessing_targets>`.
@@ -46,7 +45,7 @@ class SparkLabelEncoder(LabelEncoder, SparkTransformerMixin,
 
     __transient__ = ['classes_']
 
-    def fit(self, y):
+    def spark_fit(self, y):
         """Fit label encoder
         Parameters
         ----------
@@ -69,19 +68,7 @@ class SparkLabelEncoder(LabelEncoder, SparkTransformerMixin,
 
         return self
 
-    def fit_transform(self, y):
-        """Fit label encoder and return encoded labels
-        Parameters
-        ----------
-        y : ArrayRDD [n_samples]
-            Target values.
-        Returns
-        -------
-        y : ArrayRDD [n_samples]
-        """
-        return self.fit(y).transform(y)
-
-    def transform(self, y):
+    def spark_transform(self, y):
         """Transform labels to normalized encoding.
         Parameters
         ----------
@@ -91,11 +78,11 @@ class SparkLabelEncoder(LabelEncoder, SparkTransformerMixin,
         -------
         y : ArrayRDD [n_samples]
         """
-        mapper = super(SparkLabelEncoder, self).transform
+        mapper = super(LabelEncoder, self).transform
         mapper = self.broadcast(mapper, y.context)
         return y.transform(mapper)
 
-    def inverse_transform(self, y):
+    def spark_inverse_transform(self, y):
         """Transform labels back to original encoding.
         Parameters
         ----------
@@ -105,6 +92,6 @@ class SparkLabelEncoder(LabelEncoder, SparkTransformerMixin,
         -------
         y : ArrayRDD [n_samples]
         """
-        mapper = super(SparkLabelEncoder, self).inverse_transform
+        mapper = super(LabelEncoder, self).inverse_transform
         mapper = self.broadcast(mapper, y.context)
         return y.transform(mapper)

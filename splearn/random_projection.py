@@ -3,22 +3,25 @@ import warnings
 import numpy as np
 import scipy.sparse as sp
 from numpy.testing import assert_equal
-from sklearn.random_projection import (BaseRandomProjection,
-                                       GaussianRandomProjection,
-                                       SparseRandomProjection,
-                                       johnson_lindenstrauss_min_dim)
+from sklearn.random_projection import \
+    BaseRandomProjection as SklearnBaseRandomProjection
+from sklearn.random_projection import \
+    GaussianRandomProjection as SklearnGaussianRandomProjection
+from sklearn.random_projection import \
+    SparseRandomProjection as SklearnSparseRandomProjection
+from sklearn.random_projection import johnson_lindenstrauss_min_dim
 from sklearn.utils import DataDimensionalityWarning
 
-from .base import SparkBroadcasterMixin
+from .base import BroadcasterMixin, TransformerMixin
 from .rdd import DictRDD
 from .utils.validation import check_rdd
 
 
-class SparkBaseRandomProjection(BaseRandomProjection, SparkBroadcasterMixin):
+class BaseRandomProjection(BroadcasterMixin, TransformerMixin, SklearnBaseRandomProjection):
 
     __transient__ = ['components_']
 
-    def fit(self, Z):
+    def spark_fit(self, Z):
         """Generate a sparse random projection matrix
         Parameters
         ----------
@@ -80,7 +83,7 @@ class SparkBaseRandomProjection(BaseRandomProjection, SparkBroadcasterMixin):
 
         return self
 
-    def transform(self, Z):
+    def spark_transform(self, Z):
         """Project the data by using matrix product with the random matrix
         Parameters
         ----------
@@ -97,15 +100,13 @@ class SparkBaseRandomProjection(BaseRandomProjection, SparkBroadcasterMixin):
 
         dtype = np.ndarray if self.dense_output else None
         mapper = self.broadcast(
-            super(SparkBaseRandomProjection, self).transform, Z.context)
+            super(BaseRandomProjection, self).transform, Z.context)
         return Z.transform(mapper, column='X', dtype=dtype)
 
 
-class SparkGaussianRandomProjection(GaussianRandomProjection,
-                                    SparkBaseRandomProjection):
+class GaussianRandomProjection(BaseRandomProjection, SklearnGaussianRandomProjection):
     pass
 
 
-class SparkSparseRandomProjection(SparseRandomProjection,
-                                  SparkBaseRandomProjection):
+class SparseRandomProjection(BaseRandomProjection, SklearnSparseRandomProjection):
     pass
