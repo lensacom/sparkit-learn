@@ -29,4 +29,4 @@ class TestSparkLabelEncoder(SplearnTestCase):
         dist = LabelEncoder().fit(Y_rdd)
 
         assert_array_equal(local.inverse_transform(Y),
-                           dist.inverse_transform(Y_rdd).toarray())
+                           dist.spark_inverse_transform(Y_rdd).toarray())
