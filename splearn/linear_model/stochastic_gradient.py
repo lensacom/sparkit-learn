@@ -2,13 +2,13 @@
 
 import numpy as np
 import scipy.sparse as sp
-from sklearn.linear_model import SGDClassifier
+from sklearn.linear_model import SklearnSGDClassifier
 
 from ..utils.validation import check_rdd
-from .base import SparkLinearModelMixin
+from .base import LinearModelMixin
 
 
-class SparkSGDClassifier(SGDClassifier, SparkLinearModelMixin):
+class SGDClassifier(SklearnSGDClassifier, LinearModelMixin):
 
     """Distributed version of sklearn's Linear classifiers
     (SVM, logistic regression, a.o.) with SGD training.
@@ -139,7 +139,7 @@ class SparkSGDClassifier(SGDClassifier, SparkLinearModelMixin):
     """
 
     def __init__(self, learning_method='average', *args, **kwargs):
-        super(SparkSGDClassifier, self).__init__(*args, **kwargs)
+        super(SGDClassifier, self).__init__(*args, **kwargs)
         # self.average = True  # force averaging
         if learning_method not in ['average', 'incremental']:
             raise ValueError('learning_method must be either average or '
@@ -175,7 +175,7 @@ class SparkSGDClassifier(SGDClassifier, SparkLinearModelMixin):
         self._classes_ = np.unique(classes)
 
         if self.learning_method == 'average':
-            self._average_fit(SparkSGDClassifier, Z)
+            self._average_fit(SGDClassifier, Z)
         else:
             for X, y in Z[:, ['X', 'y']]:
                 self.partial_fit(X, y)
@@ -197,5 +197,5 @@ class SparkSGDClassifier(SGDClassifier, SparkLinearModelMixin):
         """
         check_rdd(X, (sp.spmatrix, np.ndarray))
         mapper = self.broadcast(
-            super(SparkSGDClassifier, self).predict, X.context)
+            super(SGDClassifier, self).predict, X.context)
         return X.transform(mapper, column='X')

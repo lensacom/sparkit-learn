@@ -2,13 +2,13 @@
 
 import numpy as np
 import scipy.sparse as sp
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression as SklearnLogisticRegression
 
 from ..utils.validation import check_rdd
-from .base import SparkLinearModelMixin
+from .base import LinearModelMixin
 
 
-class SparkLogisticRegression(LogisticRegression, SparkLinearModelMixin):
+class LogisticRegression(SklearnLogisticRegression, LinearModelMixin):
 
     """Distributed implementation of scikit-learn's Logistic classifier.
 
@@ -134,7 +134,7 @@ class SparkLogisticRegression(LogisticRegression, SparkLinearModelMixin):
         # possible improve to partial_fit in partisions and then average
         # in final reduce
         self._classes_ = np.unique(classes)
-        return self._average_fit(SparkLogisticRegression, Z)
+        return self._average_fit(LogisticRegression, Z)
 
     def spark_predict(self, X):
         """Distributed method to predict class labels for samples in X.
@@ -151,5 +151,5 @@ class SparkLogisticRegression(LogisticRegression, SparkLinearModelMixin):
         """
         check_rdd(X, (sp.spmatrix, np.ndarray))
         mapper = self.broadcast(
-            super(SparkLogisticRegression, self).predict, X.context)
+            super(LogisticRegression, self).predict, X.context)
         return X.transform(mapper, column='X')
