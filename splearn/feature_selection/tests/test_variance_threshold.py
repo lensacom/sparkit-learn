@@ -44,7 +44,7 @@ class TestVarianceThreshold(SplearnTestCase):
     def test_dense(self):
         X_dense, X_dense_rdd = self.make_dense_rdd()
 
-        for variance in [None, 0.03]:
+        for variance in [0., 0.03]:
             scikit = SklearnVarianceThreshold(variance)
             sparkit = VarianceThreshold(variance)
 
@@ -62,7 +62,7 @@ class TestVarianceThreshold(SplearnTestCase):
     def test_sparse(self):
         X_sparse, X_sparse_rdd = self.make_sparse_rdd()
 
-        for variance in [None, 0.03]:
+        for variance in [0., 0.03]:
             scikit = SklearnVarianceThreshold(variance)
             sparkit = VarianceThreshold(variance)
 
@@ -83,7 +83,7 @@ class TestVarianceThreshold(SplearnTestCase):
         X_sparse, X_sparse_rdd = self.make_sparse_rdd()
         Z_rdd = DictRDD([X_sparse_rdd, X_dense_rdd], columns=('X', 'Y'))
 
-        for variance in [None, 0.03]:
+        for variance in [0., 0.03]:
             scikit = SklearnVarianceThreshold(variance)
             sparkit = VarianceThreshold(variance)
 
