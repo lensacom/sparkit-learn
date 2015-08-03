@@ -1,6 +1,6 @@
 import numpy as np
-from sklearn.naive_bayes import GaussianNB, MultinomialNB
-from splearn.naive_bayes import SparkGaussianNB, SparkMultinomialNB
+from sklearn.naive_bayes import GaussianNB as SklearnGaussianNB, MultinomialNB as SklearnMultinomialNB
+from splearn.naive_bayes import GaussianNB, MultinomialNB
 from splearn.utils.testing import (SplearnTestCase, assert_array_almost_equal,
                                    assert_true)
 from splearn.utils.validation import check_rdd_dtype
@@ -11,8 +11,8 @@ class TestGaussianNB(SplearnTestCase):
     def test_same_prediction(self):
         X, y, Z = self.make_classification(2, 800000, nonnegative=True)
 
-        local = GaussianNB()
-        dist = SparkGaussianNB()
+        local = SklearnGaussianNB()
+        dist = GaussianNB()
 
         local_model = local.fit(X, y)
         dist_model = dist.fit(Z, classes=np.unique(y))
@@ -27,8 +27,8 @@ class TestMultinomialNB(SplearnTestCase):
     def test_same_prediction(self):
         X, y, Z = self.make_classification(4, 100000, nonnegative=True)
 
-        local = MultinomialNB()
-        dist = SparkMultinomialNB()
+        local = SklearnMultinomialNB()
+        dist = MultinomialNB()
 
         y_local = local.fit(X, y).predict(X)
         y_dist = dist.fit(Z, classes=np.unique(y)).predict(Z[:, 'X'])
