@@ -4,7 +4,7 @@ import numpy as np
 import scipy.sparse as sp
 from sklearn.base import copy
 from sklearn.linear_model import LinearRegression as SklearnLinearRegression
-from splearn.base import BroadcasterMixin
+from splearn.base import BroadcasterMixin, TransformerMixin
 
 from ..utils.validation import check_rdd
 
@@ -89,7 +89,7 @@ class LinearModelMixin(object):
         return self
 
 
-class LinearRegression(BroadcasterMixin, LinearModelMixin,
+class LinearRegression(TransformerMixin, BroadcasterMixin, LinearModelMixin,
                        SklearnLinearRegression):
 
     """Distributed implementation of sklearn's Linear Regression.

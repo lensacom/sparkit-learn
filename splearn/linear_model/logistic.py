@@ -6,9 +6,10 @@ from sklearn.linear_model import LogisticRegression as SklearnLogisticRegression
 
 from ..utils.validation import check_rdd
 from .base import LinearModelMixin
+from splearn.base import TransformerMixin
 
 
-class LogisticRegression(SklearnLogisticRegression, LinearModelMixin):
+class LogisticRegression(TransformerMixin, SklearnLogisticRegression, LinearModelMixin):
 
     """Distributed implementation of scikit-learn's Logistic classifier.
 

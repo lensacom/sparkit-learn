@@ -6,9 +6,10 @@ from sklearn.linear_model import SGDClassifier as SklearnSGDClassifier
 
 from ..utils.validation import check_rdd
 from .base import LinearModelMixin
+from splearn.base import TransformerMixin
 
 
-class SGDClassifier(SklearnSGDClassifier, LinearModelMixin):
+class SGDClassifier(TransformerMixin, SklearnSGDClassifier, LinearModelMixin):
 
     """Distributed version of sklearn's Linear classifiers
     (SVM, logistic regression, a.o.) with SGD training.
