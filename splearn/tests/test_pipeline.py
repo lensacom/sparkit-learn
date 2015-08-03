@@ -132,7 +132,7 @@ class TestFeatureUnion(SplearnTestCase):
         loc_char = SklearnCountVectorizer(analyzer="char_wb", ngram_range=(3, 3))
         dist_char = CountVectorizer(analyzer="char_wb", ngram_range=(3, 3))
 
-        loc_word = SklearnVectorizer(analyzer="word")
+        loc_word = SklearnCountVectorizer(analyzer="word")
         dist_word = CountVectorizer(analyzer="word")
 
         loc_union = SklearnFeatureUnion([

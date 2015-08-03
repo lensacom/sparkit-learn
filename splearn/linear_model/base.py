@@ -137,6 +137,9 @@ class LinearRegression(TransformerMixin, BroadcasterMixin, LinearModelMixin,
         check_rdd(Z, {'X': (sp.spmatrix, np.ndarray)})
         return self._average_fit(LinearRegression, Z)
 
+    def predict(self, X):
+        return self.spark_predict(X)
+
     def spark_predict(self, X):
         """Distributed method to predict class labels for samples in X.
 

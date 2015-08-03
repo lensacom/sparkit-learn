@@ -6,10 +6,11 @@ from sklearn.linear_model import LogisticRegression as SklearnLogisticRegression
 
 from ..utils.validation import check_rdd
 from .base import LinearModelMixin
-from splearn.base import TransformerMixin
+from splearn.base import BroadcasterMixin, TransformerMixin
 
 
-class LogisticRegression(TransformerMixin, SklearnLogisticRegression, LinearModelMixin):
+class LogisticRegression(TransformerMixin, BroadcasterMixin, LinearModelMixin,
+                         SklearnLogisticRegression):
 
     """Distributed implementation of scikit-learn's Logistic classifier.
 
@@ -136,6 +137,9 @@ class LogisticRegression(TransformerMixin, SklearnLogisticRegression, LinearMode
         # in final reduce
         self._classes_ = np.unique(classes)
         return self._average_fit(LogisticRegression, Z)
+
+    def predict(self, X):
+        return self.spark_predict(X)
 
     def spark_predict(self, X):
         """Distributed method to predict class labels for samples in X.

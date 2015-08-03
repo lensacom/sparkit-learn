@@ -6,10 +6,11 @@ from sklearn.linear_model import SGDClassifier as SklearnSGDClassifier
 
 from ..utils.validation import check_rdd
 from .base import LinearModelMixin
-from splearn.base import TransformerMixin
+from splearn.base import BroadcasterMixin, TransformerMixin
 
 
-class SGDClassifier(TransformerMixin, SklearnSGDClassifier, LinearModelMixin):
+class SGDClassifier(TransformerMixin, BroadcasterMixin, LinearModelMixin,
+                    SklearnSGDClassifier):
 
     """Distributed version of sklearn's Linear classifiers
     (SVM, logistic regression, a.o.) with SGD training.
@@ -182,6 +183,9 @@ class SGDClassifier(TransformerMixin, SklearnSGDClassifier, LinearModelMixin):
                 self.partial_fit(X, y)
 
         return self
+
+    def predict(self, X):
+        return self.spark_predict(X)
 
     def spark_predict(self, X):
         """Distributed method to predict class labels for samples in X.
