@@ -1,17 +1,17 @@
 import numpy as np
 import scipy.sparse as sp
 from sklearn.base import clone
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.feature_selection import VarianceThreshold
-from sklearn.linear_model.logistic import LogisticRegression
-from sklearn.pipeline import FeatureUnion, Pipeline
+from sklearn.feature_extraction.text import CountVectorizer as SklearnCountVectorizer
+from sklearn.feature_selection import VarianceThreshold as SklearnVarianceThreshold
+from sklearn.linear_model.logistic import LogisticRegression as SklearnLogisticRegression
+from sklearn.pipeline import FeatureUnion as SklearnFeatureUnion, Pipeline as SklearnPipeline
 from sklearn.utils.testing import (assert_array_equal, assert_equal,
                                    assert_false, assert_raises, assert_true)
-from splearn.decomposition import SparkTruncatedSVD
-from splearn.feature_extraction.text import SparkCountVectorizer
-from splearn.feature_selection import SparkVarianceThreshold
-from splearn.linear_model.logistic import SparkLogisticRegression
-from splearn.pipeline import SparkFeatureUnion, SparkPipeline, make_sparkunion
+from splearn.decomposition import TruncatedSVD
+from splearn.feature_extraction.text import CountVectorizer
+from splearn.feature_selection import VarianceThreshold
+from splearn.linear_model.logistic import LogisticRegression
+from splearn.pipeline import FeatureUnion, Pipeline, make_sparkunion
 from splearn.utils.testing import SplearnTestCase
 
 
@@ -81,17 +81,17 @@ class TestFeatureUnion(SplearnTestCase):
     def test_same_result(self):
         X, Z = self.make_text_rdd(2)
 
-        loc_char = CountVectorizer(analyzer="char_wb", ngram_range=(3, 3))
-        dist_char = SparkCountVectorizer(analyzer="char_wb", ngram_range=(3, 3))
+        loc_char = SklearnCountVectorizer(analyzer="char_wb", ngram_range=(3, 3))
+        dist_char = CountVectorizer(analyzer="char_wb", ngram_range=(3, 3))
 
-        loc_word = CountVectorizer(analyzer="word")
-        dist_word = SparkCountVectorizer(analyzer="word")
+        loc_word = SklearnCountVectorizer(analyzer="word")
+        dist_word = CountVectorizer(analyzer="word")
 
-        loc_union = FeatureUnion([
+        loc_union = SklearnFeatureUnion([
             ("chars", loc_char),
             ("words", loc_word)
         ])
-        dist_union = SparkFeatureUnion([
+        dist_union = FeatureUnion([
             ("chars", dist_char),
             ("words", dist_word)
         ])
@@ -111,11 +111,11 @@ class TestFeatureUnion(SplearnTestCase):
         Z_transformed = sp.vstack(dist_union.fit_transform(Z).collect())
         assert_array_equal(X_transformed.toarray(), Z_transformed.toarray())
         # test same results in parallel
-        loc_union_par = FeatureUnion([
+        loc_union_par = SklearnFeatureUnion([
             ("chars", loc_char),
             ("words", loc_word)
         ], n_jobs=2)
-        dist_union_par = SparkFeatureUnion([
+        dist_union_par = FeatureUnion([
             ("chars", dist_char),
             ("words", dist_word)
         ], n_jobs=2)
@@ -129,17 +129,17 @@ class TestFeatureUnion(SplearnTestCase):
     def test_same_result_weight(self):
         X, Z = self.make_text_rdd(2)
 
-        loc_char = CountVectorizer(analyzer="char_wb", ngram_range=(3, 3))
-        dist_char = SparkCountVectorizer(analyzer="char_wb", ngram_range=(3, 3))
+        loc_char = SklearnCountVectorizer(analyzer="char_wb", ngram_range=(3, 3))
+        dist_char = CountVectorizer(analyzer="char_wb", ngram_range=(3, 3))
 
-        loc_word = CountVectorizer(analyzer="word")
-        dist_word = SparkCountVectorizer(analyzer="word")
+        loc_word = SklearnVectorizer(analyzer="word")
+        dist_word = CountVectorizer(analyzer="word")
 
-        loc_union = FeatureUnion([
+        loc_union = SklearnFeatureUnion([
             ("chars", loc_char),
             ("words", loc_word)
         ], transformer_weights={"words": 10})
-        dist_union = SparkFeatureUnion([
+        dist_union = FeatureUnion([
             ("chars", dist_char),
             ("words", dist_word)
         ], transformer_weights={"words": 10})
@@ -152,7 +152,7 @@ class TestFeatureUnion(SplearnTestCase):
         assert_array_equal(X_transformed.toarray(), Z_transformed.toarray())
 
     def test_make_union(self):
-        svd = SparkTruncatedSVD()
+        svd = TruncatedSVD()
         mock = TransfT()
         fu = make_sparkunion(svd, mock)
         names, transformers = list(zip(*fu.transformer_list))
@@ -164,13 +164,13 @@ class TestPipeline(SplearnTestCase):
 
     def test_pipeline_init(self):
         # Test the various init parameters of the pipeline.
-        assert_raises(TypeError, SparkPipeline)
+        assert_raises(TypeError, Pipeline)
         # Check that we can't instantiate pipelines with objects without fit
         # method
-        pipe = assert_raises(TypeError, SparkPipeline, [('svc', IncorrectT)])
+        pipe = assert_raises(TypeError, Pipeline, [('svc', IncorrectT)])
         # Smoke test with only an estimator
         clf = T()
-        pipe = SparkPipeline([('svc', clf)])
+        pipe = Pipeline([('svc', clf)])
         assert_equal(pipe.get_params(deep=True),
                      dict(svc__a=None, svc__b=None, svc=clf,
                           **pipe.get_params(deep=False)
@@ -184,12 +184,12 @@ class TestPipeline(SplearnTestCase):
         repr(pipe)
 
         # Test with two objects
-        vect = SparkCountVectorizer()
-        filter = SparkVarianceThreshold()
-        pipe = SparkPipeline([('vect', vect), ('filter', filter)])
+        vect = CountVectorizer()
+        filter = VarianceThreshold()
+        pipe = Pipeline([('vect', vect), ('filter', filter)])
 
         # Check that we can't use the same stage name twice
-        assert_raises(ValueError, SparkPipeline,
+        assert_raises(ValueError, Pipeline,
                       [('vect', vect), ('vect', vect)])
 
         # Check that params are set
@@ -225,16 +225,16 @@ class TestPipeline(SplearnTestCase):
     def test_pipeline_same_results(self):
         X, y, Z = self.make_classification(2, 10000, 2000)
 
-        loc_clf = LogisticRegression()
-        loc_filter = VarianceThreshold()
-        loc_pipe = Pipeline([
+        loc_clf = SklearnLogisticRegression()
+        loc_filter = SklearnVarianceThreshold()
+        loc_pipe = SklearnPipeline([
             ('threshold', loc_filter),
             ('logistic', loc_clf)
         ])
 
-        dist_clf = SparkLogisticRegression()
-        dist_filter = SparkVarianceThreshold()
-        dist_pipe = SparkPipeline([
+        dist_clf = LogisticRegression()
+        dist_filter = VarianceThreshold()
+        dist_pipe = Pipeline([
             ('threshold', dist_filter),
             ('logistic', dist_clf)
         ])
