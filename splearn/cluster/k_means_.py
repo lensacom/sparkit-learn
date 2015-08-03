@@ -3,13 +3,13 @@
 import numpy as np
 import scipy.sparse as sp
 from pyspark.mllib.clustering import KMeans as MLlibKMeans
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans as SklearnKMeans
 
 from ..rdd import ArrayRDD, DictRDD
 from ..utils.validation import check_rdd
 
 
-class SparkKMeans(KMeans):
+class KMeans(SklearnKMeans):
 
     """Distributed K-Means clustering
 
@@ -68,7 +68,7 @@ class SparkKMeans(KMeans):
     """
 
     def __init__(self, *args, **kwargs):
-        super(SparkKMeans, self).__init__(*args, **kwargs)
+        super(KMeans, self).__init__(*args, **kwargs)
 
     def fit(self, Z):
         """Compute k-means clustering.
@@ -92,9 +92,9 @@ class SparkKMeans(KMeans):
                 initializationMode="k-means||")
             self.cluster_centers_ = self._mllib_model.centers
         else:
-            models = X.map(lambda X: super(SparkKMeans, self).fit(X))
+            models = X.map(lambda X: super(KMeans, self).fit(X))
             models = models.map(lambda model: model.cluster_centers_).collect()
-            return super(SparkKMeans, self).fit(np.concatenate(models))
+            return super(KMeans, self).fit(np.concatenate(models))
 
     def predict(self, X):
         """Predict the closest cluster each sample in X belongs to.
@@ -120,5 +120,5 @@ class SparkKMeans(KMeans):
                 X = X.tolist()
             return self._mllib_model.predict(X)
         else:
-            rdd = X.map(lambda X: super(SparkKMeans, self).predict(X))
+            rdd = X.map(lambda X: super(KMeans, self).predict(X))
             return ArrayRDD(rdd)

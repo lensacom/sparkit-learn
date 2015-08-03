@@ -1,6 +1,6 @@
 import numpy as np
-from sklearn.linear_model import SGDClassifier
-from splearn.linear_model import SparkSGDClassifier
+from sklearn.linear_model import SGDClassifier as SklearnSGDClassifier
+from splearn.linear_model import SGDClassifier
 from splearn.utils.testing import SplearnTestCase, assert_true
 from splearn.utils.testing import assert_array_almost_equal
 from splearn.utils.validation import check_rdd_dtype
@@ -11,8 +11,8 @@ class TestSGDClassifier(SplearnTestCase):
     def test_average_prediction(self):
         X, y, Z = self.make_classification(2, 80000)
 
-        local = SGDClassifier(average=True)
-        dist = SparkSGDClassifier(average=True, learning_method='average')
+        local = SklearnSGDClassifier(average=True)
+        dist = SGDClassifier(average=True, learning_method='average')
 
         local.fit(X, y)
         dist.fit(Z, classes=np.unique(y))
@@ -29,8 +29,8 @@ class TestSGDClassifier(SplearnTestCase):
     def test_incremental_prediction(self):
         X, y, Z = self.make_classification(2, 80000)
 
-        local = SGDClassifier(average=True)
-        dist = SparkSGDClassifier(average=True, learning_method='incremental')
+        local = SklearnSGDClassifier(average=True)
+        dist = SGDClassifier(average=True, learning_method='incremental')
 
         local.fit(X, y)
         dist.fit(Z, classes=np.unique(y))

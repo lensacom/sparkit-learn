@@ -3,13 +3,16 @@
 import numpy as np
 import scipy.sparse as sp
 from sklearn.base import copy
-from sklearn.naive_bayes import (BaseDiscreteNB, BaseNB, BernoulliNB,
-                                 GaussianNB, MultinomialNB)
-from splearn.base import SparkClassifierMixin
+from sklearn.naive_bayes import (BaseDiscreteNB as SklearnBaseDiscreteNB,
+                                 BaseNB as SklearnBaseNB,
+                                 BernoulliNB as SklearnBernoulliNB,
+                                 GaussianNB as SklearnGaussianNB,
+                                 MultinomialNB as SklearnMultinomialNB)
+from splearn.base import ClassifierMixin
 from splearn.utils.validation import check_rdd
 
 
-class SparkBaseNB(BaseNB, SparkClassifierMixin):
+class BaseNB(SklearnBaseNB, ClassifierMixin):
 
     """Abstract base class for distributed naive Bayes estimators"""
 
@@ -31,7 +34,7 @@ class SparkBaseNB(BaseNB, SparkClassifierMixin):
         """
         check_rdd(X, (sp.spmatrix, np.ndarray))
         return X.map(
-            lambda X: super(SparkBaseNB, self).predict(X))
+            lambda X: super(BaseNB, self).predict(X))
 
     def predict_proba(self, X):
         """
@@ -50,7 +53,7 @@ class SparkBaseNB(BaseNB, SparkClassifierMixin):
         """
         check_rdd(X, (sp.spmatrix, np.ndarray))
         return X.map(
-            lambda X: super(SparkBaseNB, self).predict_proba(X))
+            lambda X: super(BaseNB, self).predict_proba(X))
 
     def predict_log_proba(self, X):
         """
@@ -70,10 +73,10 @@ class SparkBaseNB(BaseNB, SparkClassifierMixin):
         """
         check_rdd(X, (sp.spmatrix, np.ndarray))
         return X.map(
-            lambda X: super(SparkBaseNB, self).predict_log_proba(X))
+            lambda X: super(BaseNB, self).predict_log_proba(X))
 
 
-class SparkGaussianNB(GaussianNB, SparkBaseNB):
+class GaussianNB(SklearnGaussianNB, BaseNB):
 
     """
     Distributed Gaussian Naive Bayes (SparkGaussianNB)
@@ -153,7 +156,7 @@ class SparkGaussianNB(GaussianNB, SparkBaseNB):
         return this
 
 
-class SparkBaseDiscreteNB(BaseDiscreteNB, SparkBaseNB):
+class BaseDiscreteNB(SklearnBaseDiscreteNB, BaseNB):
 
     """
     Abstract base class for distributed naive Bayes on discrete/categorical
@@ -220,9 +223,9 @@ class SparkBaseDiscreteNB(BaseDiscreteNB, SparkBaseNB):
         return self
 
 
-class SparkMultinomialNB(MultinomialNB, SparkBaseDiscreteNB):
+class MultinomialNB(SklearnMultinomialNB, BaseDiscreteNB):
     pass
 
 
-class SparkBernoulliNB(BernoulliNB, SparkBaseDiscreteNB):
+class BernoulliNB(SklearnBernoulliNB, BaseDiscreteNB):
     pass
