@@ -469,8 +469,9 @@ class TestDenseMath(SplearnTestCase):
     def test_dot(self):
         A, A_rdd = self.make_dense_rdd((20, 10))
         B, B_rdd = self.make_dense_rdd((10, 20))
-        assert_array_equal(A_rdd.dot(B).toarray(), A.dot(B))
-        assert_array_equal(B_rdd.dot(A).toarray(), B.dot(A))
+
+        assert_array_almost_equal(A_rdd.dot(B).toarray(), A.dot(B))
+        assert_array_almost_equal(B_rdd.dot(A).toarray(), B.dot(A))
 
     def test_add(self):
         A, A_rdd = self.make_dense_rdd((8, 3))

@@ -778,4 +778,3 @@ class DictRDD(BlockRDD):
         return DictRDD(self._rdd.map(mapper),
                        columns=self.columns, dtype=dtypes,
                        bsize=self.bsize, noblock=True)
-

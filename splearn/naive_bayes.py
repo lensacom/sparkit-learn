@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
 
+import operator
+
 import numpy as np
 import scipy.sparse as sp
 from sklearn.base import copy
-from sklearn.naive_bayes import (BaseDiscreteNB as SklearnBaseDiscreteNB,
-                                 BaseNB as SklearnBaseNB,
-                                 BernoulliNB as SklearnBernoulliNB,
-                                 GaussianNB as SklearnGaussianNB,
-                                 MultinomialNB as SklearnMultinomialNB)
+from sklearn.naive_bayes import BaseDiscreteNB as SklearnBaseDiscreteNB
+from sklearn.naive_bayes import BaseNB as SklearnBaseNB
+from sklearn.naive_bayes import BernoulliNB as SklearnBernoulliNB
+from sklearn.naive_bayes import GaussianNB as SklearnGaussianNB
+from sklearn.naive_bayes import MultinomialNB as SklearnMultinomialNB
 from splearn.base import ClassifierMixin
 from splearn.utils.validation import check_rdd
 
@@ -125,7 +127,7 @@ class GaussianNB(SklearnGaussianNB, BaseNB):
         check_rdd(Z, {'X': (sp.spmatrix, np.ndarray), 'y': (sp.spmatrix, np.ndarray)})
         models = Z[:, ['X', 'y']].map(
             lambda X_y: self.partial_fit(X_y[0], X_y[1], classes))
-        avg = models.sum()
+        avg = models.reduce(operator.add)
         self.__dict__.update(avg.__dict__)
         return self
 
