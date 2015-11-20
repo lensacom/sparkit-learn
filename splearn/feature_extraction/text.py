@@ -136,6 +136,11 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
 
     __transient__ = ['vocabulary_']
 
+    def to_scikit(self):
+        obj = CountVectorizer([])
+        obj.__dict__ = self.__dict__
+        return obj
+
     def _init_vocab(self, analyzed_docs):
         """Create vocabulary
         """
