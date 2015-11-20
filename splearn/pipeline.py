@@ -141,6 +141,15 @@ class SparkPipeline(Pipeline):
             out.update(super(SparkPipeline, self).get_params(deep=False))
             return out
 
+    def to_scikit(self):
+        scikit_steps = []
+        for name, step in self.steps:
+            if hasattr(step, 'to_scikit'):
+                scikit_steps.append((name, step.to_scikit()))
+            else:
+                scikit_steps.append((name, step))
+        return Pipeline(scikit_steps)
+
 ################################################################################
 
 
