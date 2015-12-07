@@ -16,6 +16,8 @@ class TestSparkRandomForest(SplearnTestCase):
 
         y_local = local.fit(X, y).predict(X)
         y_dist = dist.fit(Z, classes=np.unique(y)).predict(Z[:, 'X'])
+        y_conv = dist.to_scikit().predict(X)
 
         assert_true(check_rdd_dtype(y_dist, (np.ndarray,)))
         assert(sum(y_local != y_dist.toarray()) < len(y_local) * 2./100.)
+        assert(sum(y_local != y_conv) < len(y_local) * 2./100.)

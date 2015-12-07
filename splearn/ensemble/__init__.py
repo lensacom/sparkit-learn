@@ -164,3 +164,8 @@ class SparkPseudoRandomForestClassifier(RandomForestClassifier):
         """
         check_rdd(X, (sp.spmatrix, np.ndarray))
         return X.map(lambda X: super(SparkPseudoRandomForestClassifier, self).predict(X))
+
+    def to_scikit(self):
+        new = RandomForestClassifier()
+        new.__dict__ = self.__dict__
+        return new
