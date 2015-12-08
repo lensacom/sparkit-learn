@@ -492,6 +492,11 @@ class SparkHashingVectorizer(HashingVectorizer):
 
     fit_transform = transform
 
+    def to_scikit(self):
+        obj = HashingVectorizer()
+        obj.__dict__ = self.__dict__
+        return obj
+
 
 class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
 
@@ -604,3 +609,8 @@ class SparkTfidfTransformer(TfidfTransformer, SparkBroadcasterMixin):
             mapper = self.broadcast(mapper, Z.context)
 
         return Z.transform(mapper, column='X', dtype=sp.spmatrix)
+
+    def to_scikit(self):
+        obj = TfidfTransformer()
+        obj.__dict__ = self.__dict__
+        return obj
