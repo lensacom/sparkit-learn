@@ -377,7 +377,7 @@ Distributed Classifiers
     X = [...]  # list of texts
     y = [...]  # list of labels
     X_rdd = sc.parallelize(X, 4)
-    y_rdd = sc.parralelize(y, 4)
+    y_rdd = sc.parallelize(y, 4)
     Z = DictRDD((X_rdd, y_rdd),
                 columns=('X', 'y'),
                 dtype=[np.ndarray, np.ndarray])
@@ -415,7 +415,7 @@ Distributed Model Selection
     X = [...]
     y = [...]
     X_rdd = sc.parallelize(X, 4)
-    y_rdd = sc.parralelize(y, 4)
+    y_rdd = sc.parallelize(y, 4)
     Z = DictRDD((X_rdd, y_rdd),
                 columns=('X', 'y'),
                 dtype=[np.ndarray, np.ndarray])
