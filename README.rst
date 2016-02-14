@@ -377,7 +377,7 @@ Distributed Classifiers
     X = [...]  # list of texts
     y = [...]  # list of labels
     X_rdd = sc.parallelize(X, 4)
-    y_rdd = sc.parralelize(y, 4)
+    y_rdd = sc.parallelize(y, 4)
     Z = DictRDD((X_rdd, y_rdd),
                 columns=('X', 'y'),
                 dtype=[np.ndarray, np.ndarray])
@@ -415,7 +415,7 @@ Distributed Model Selection
     X = [...]
     y = [...]
     X_rdd = sc.parallelize(X, 4)
-    y_rdd = sc.parralelize(y, 4)
+    y_rdd = sc.parallelize(y, 4)
     Z = DictRDD((X_rdd, y_rdd),
                 columns=('X', 'y'),
                 dtype=[np.ndarray, np.ndarray])
@@ -443,6 +443,11 @@ Special thanks
 - spylearn community
 - pyspark community
 
+Similar Projects
+===============
+
+- `Thunder <https://github.com/thunder-project/thunder>`_
+- `Bolt <https://github.com/bolt-project/bolt>`_
 
 .. |Build Status| image:: https://travis-ci.org/lensacom/sparkit-learn.png?branch=master
    :target: https://travis-ci.org/lensacom/sparkit-learn
