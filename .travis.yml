@@ -5,16 +5,17 @@ jdk:
 
 env:
   matrix:
-    - SPARK_VERSION="1.3.1" PYTHON_VERSION="2.7"
-    - SPARK_VERSION="1.4.0" PYTHON_VERSION="2.7"
-    - SPARK_VERSION="1.4.0" PYTHON_VERSION="3.4"
+    - SPARK_VERSION="1.4.1" PYTHON_VERSION="2.7"
+    - SPARK_VERSION="1.4.1" PYTHON_VERSION="3.4"
+    - SPARK_VERSION="1.5.1" PYTHON_VERSION="2.7"
+    - SPARK_VERSION="1.5.1" PYTHON_VERSION="3.4"
 
 before_install:
   - sudo apt-get update
-  - if [[ "$SPARK_VERSION" == "1.3.1" ]]; then
-      wget http://d3kbcqa49mib13.cloudfront.net/spark-1.3.1-bin-hadoop2.4.tgz;
+  - if [[ "$SPARK_VERSION" == "1.5.1" ]]; then
+      wget http://d3kbcqa49mib13.cloudfront.net/spark-1.5.1-bin-hadoop2.6.tgz;
     else
-      wget http://d3kbcqa49mib13.cloudfront.net/spark-1.4.0-bin-hadoop2.6.tgz;
+      wget http://d3kbcqa49mib13.cloudfront.net/spark-1.4.1-bin-hadoop2.6.tgz;
     fi
   - if [[ "$PYTHON_VERSION" == "2.7" ]]; then
       wget http://repo.continuum.io/miniconda/Miniconda-3.7.3-Linux-x86_64.sh -O miniconda.sh;
@@ -34,12 +35,12 @@ install:
   - source activate test-environment
   - pip install -r requirements.txt
   - pip install rednose
-  - if [[ "$SPARK_VERSION" == "1.3.1" ]]; then
-      tar -xzf spark-1.3.1-bin-hadoop2.4.tgz;
-      export SPARK_HOME=`pwd`/spark-1.3.1-bin-hadoop2.4;
+  - if [[ "$SPARK_VERSION" == "1.5.1" ]]; then
+      tar -xzvf spark-1.5.1-bin-hadoop2.6.tgz;
+      export SPARK_HOME=`pwd`/spark-1.5.1-bin-hadoop2.6;
     else
-      tar -xzf spark-1.4.0-bin-hadoop2.6.tgz;
-      export SPARK_HOME=`pwd`/spark-1.4.0-bin-hadoop2.6;
+      tar -xzf spark-1.4.1-bin-hadoop2.6.tgz;
+      export SPARK_HOME=`pwd`/spark-1.4.1-bin-hadoop2.6;
     fi
   - sudo rm -rf /dev/shm && sudo ln -s /run/shm /dev/shm
 
