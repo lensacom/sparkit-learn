@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import operator
+
 import numpy as np
 import scipy.sparse as sp
 from sklearn.base import copy
@@ -122,7 +124,7 @@ class SparkGaussianNB(GaussianNB, SparkBaseNB):
         check_rdd(Z, {'X': (sp.spmatrix, np.ndarray), 'y': (sp.spmatrix, np.ndarray)})
         models = Z[:, ['X', 'y']].map(
             lambda X_y: self.partial_fit(X_y[0], X_y[1], classes))
-        avg = models.sum()
+        avg = models.reduce(operator.add)
         self.__dict__.update(avg.__dict__)
         return self
 

@@ -15,7 +15,11 @@ def _check_cv(cv, Z=None):
         cv = 3
     if isinstance(cv, numbers.Integral):
         n_samples = Z.count()
-        cv = KFold(n_samples, cv, indices=True)
+        try:
+            # scikit-learn version under 0.17
+            cv = KFold(n_samples, cv, indices=True)
+        except:
+            cv = KFold(n_samples, cv)
     if not getattr(cv, "_indices", True):
         raise ValueError("Sparse data and lists require indices-based cross"
                          " validation generator, got: %r", cv)

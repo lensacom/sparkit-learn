@@ -1,5 +1,7 @@
 # encoding: utf-8
 
+import operator
+
 import numpy as np
 import scipy.sparse as sp
 from sklearn.base import copy
@@ -81,7 +83,7 @@ class SparkLinearModelMixin(object):
             X_y[0], X_y[1], *args, **kwargs
         )
         models = Z.map(mapper)
-        avg = models.sum() / models.count()
+        avg = models.reduce(operator.add) / models.count()
         self.__dict__.update(avg.__dict__)
         return self
 

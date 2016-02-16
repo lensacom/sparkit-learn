@@ -7,20 +7,24 @@ env:
   matrix:
     - SPARK_VERSION="1.4.1" PYTHON_VERSION="2.7"
     - SPARK_VERSION="1.4.1" PYTHON_VERSION="3.4"
-    - SPARK_VERSION="1.5.1" PYTHON_VERSION="2.7"
-    - SPARK_VERSION="1.5.1" PYTHON_VERSION="3.4"
+    - SPARK_VERSION="1.5.2" PYTHON_VERSION="2.7"
+    - SPARK_VERSION="1.5.2" PYTHON_VERSION="3.4"
+    - SPARK_VERSION="1.6.0" PYTHON_VERSION="2.7"
+    - SPARK_VERSION="1.6.0" PYTHON_VERSION="3.4"
 
 before_install:
   - sudo apt-get update
-  - if [[ "$SPARK_VERSION" == "1.5.1" ]]; then
-      wget http://d3kbcqa49mib13.cloudfront.net/spark-1.5.1-bin-hadoop2.6.tgz;
+  - if [[ "$SPARK_VERSION" == "1.6.0" ]]; then
+      wget http://d3kbcqa49mib13.cloudfront.net/spark-1.6.0-bin-hadoop2.6.tgz;
+    elif [[ "$SPARK_VERSION" == "1.5.2" ]]; then
+      wget http://d3kbcqa49mib13.cloudfront.net/spark-1.5.2-bin-hadoop2.6.tgz;
     else
       wget http://d3kbcqa49mib13.cloudfront.net/spark-1.4.1-bin-hadoop2.6.tgz;
     fi
   - if [[ "$PYTHON_VERSION" == "2.7" ]]; then
-      wget http://repo.continuum.io/miniconda/Miniconda-3.7.3-Linux-x86_64.sh -O miniconda.sh;
+      wget http://repo.continuum.io/miniconda/Miniconda-3.19.0-Linux-x86_64.sh -O miniconda.sh;
     else
-      wget http://repo.continuum.io/miniconda/Miniconda3-3.7.3-Linux-x86_64.sh -O miniconda.sh;
+      wget http://repo.continuum.io/miniconda/Miniconda3-3.19.0-Linux-x86_64.sh -O miniconda.sh;
     fi
   - bash miniconda.sh -b -p $HOME/miniconda
   - export PATH="$HOME/miniconda/bin:$PATH"

@@ -436,6 +436,15 @@ Distributed Model Selection
     grid.fit(Z)
 
 
+ROADMAP
+=======
+
+- [ ] Transparent API to support plain numpy and scipy objects (partially done in the transparent_api branch)
+- [ ] Update all dependencies
+- [ ] Use Mllib and ML packages more extensively (since it becames more mature)
+- [ ] Support Spark DataFrames
+
+
 Special thanks
 ==============
 
@@ -456,4 +465,3 @@ Similar Projects
 .. |Gitter| image:: https://badges.gitter.im/Join%20Chat.svg
    :alt: Join the chat at https://gitter.im/lensacom/sparkit-learn
    :target: https://gitter.im/lensacom/sparkit-learn?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
-
