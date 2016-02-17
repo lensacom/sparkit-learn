@@ -39,13 +39,7 @@ install:
   - source activate test-environment
   - pip install -r requirements.txt
   - pip install rednose
-  - if [[ "$SPARK_VERSION" == "1.5.1" ]]; then
-      tar -xzvf spark-1.5.1-bin-hadoop2.6.tgz;
-      export SPARK_HOME=`pwd`/spark-1.5.1-bin-hadoop2.6;
-    else
-      tar -xzf spark-1.4.1-bin-hadoop2.6.tgz;
-      export SPARK_HOME=`pwd`/spark-1.4.1-bin-hadoop2.6;
-    fi
+  - tar -xzvf spark-${SPARK_VERSION}-bin-hadoop2.6.tgz && export SPARK_HOME=`pwd`/spark-${SPARK_VERSION}-bin-hadoop2.6;
   - sudo rm -rf /dev/shm && sudo ln -s /run/shm /dev/shm
 
 script:
