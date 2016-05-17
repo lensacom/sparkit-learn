@@ -109,6 +109,7 @@ class SparkPipeline(Pipeline):
         """
         Zt, fit_params = self._pre_transform(Z, **fit_params)
         self.steps[-1][-1].fit(Zt, **fit_params)
+        Zt.unpersist()
         return self
 
     def fit_transform(self, Z, **fit_params):

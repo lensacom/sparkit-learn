@@ -602,8 +602,7 @@ class DictRDD(BlockRDD):
             elif not all(isinstance(r, RDD) for r in rdd):
                 raise TypeError("All element must be an instance of RDD or"
                                 " BlockRDD!")
-            rdd = functools.reduce(lambda t, x: t.zip(x).map(zipper), rdd) \
-                           .persist()
+            rdd = functools.reduce(lambda t, x: t.zip(x).map(zipper), rdd)
         elif isinstance(rdd, (RDD, BlockRDD)):
             if columns is None:
                 columns = list(range(len(rdd.first())))
