@@ -255,6 +255,7 @@ class SparkFeatureUnion(FeatureUnion):
             if sp.issparse(item):
                 return X.map(lambda x: sp.hstack(x))
         X = X.map(lambda x: np.hstack(x))
+        return X
 
     def transform(self, Z):
         """TODO: rewrite docstring
