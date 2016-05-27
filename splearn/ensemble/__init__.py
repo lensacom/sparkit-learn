@@ -9,7 +9,7 @@ from sklearn.ensemble import RandomForestClassifier
 from ..utils.validation import check_rdd
 
 
-class SparkPseudoRandomForestClassifier(RandomForestClassifier):
+class SparkRandomForestClassifier(RandomForestClassifier):
 
     """Distributed version of sklearn's Random Forest Classification.
 
@@ -136,7 +136,7 @@ class SparkPseudoRandomForestClassifier(RandomForestClassifier):
             Returns self.
         """
         check_rdd(Z, {'X': (sp.spmatrix, np.ndarray)})
-        mapper = lambda X_y: super(SparkPseudoRandomForestClassifier, self).fit(
+        mapper = lambda X_y: super(SparkRandomForestClassifier, self).fit(
             X_y[0], X_y[1]
         )
 
@@ -163,7 +163,7 @@ class SparkPseudoRandomForestClassifier(RandomForestClassifier):
             Predicted class label per sample.
         """
         check_rdd(X, (sp.spmatrix, np.ndarray))
-        return X.map(lambda X: super(SparkPseudoRandomForestClassifier, self).predict(X))
+        return X.map(lambda X: super(SparkRandomForestClassifier, self).predict(X))
 
     def to_scikit(self):
         new = RandomForestClassifier()

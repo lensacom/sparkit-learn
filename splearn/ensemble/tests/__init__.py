@@ -1,7 +1,7 @@
 import numpy as np
 from nose.tools import assert_true
 from sklearn.ensemble import RandomForestClassifier
-from splearn.ensemble import SparkPseudoRandomForestClassifier
+from splearn.ensemble import SparkRandomForestClassifier
 from splearn.utils.testing import SplearnTestCase
 from splearn.utils.validation import check_rdd_dtype
 
@@ -12,7 +12,7 @@ class TestSparkRandomForest(SplearnTestCase):
         X, y, Z = self.make_classification(2, 10000)
 
         local = RandomForestClassifier()
-        dist = SparkPseudoRandomForestClassifier()
+        dist = SparkRandomForestClassifier()
 
         y_local = local.fit(X, y).predict(X)
         y_dist = dist.fit(Z, classes=np.unique(y)).predict(Z[:, 'X'])
