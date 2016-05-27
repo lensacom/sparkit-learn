@@ -104,6 +104,11 @@ class SparkLinearModelMixin(object):
         """
         return X.map(lambda X: super(cls, self).predict(X, *args, **kwargs))
 
+    def _to_scikit(self, cls):
+        new = cls()
+        new.__dict__ = self.__dict__
+        return new
+
 
 class SparkLinearRegression(LinearRegression, SparkLinearModelMixin):
 
@@ -167,3 +172,6 @@ class SparkLinearRegression(LinearRegression, SparkLinearModelMixin):
         """
         check_rdd(X, (sp.spmatrix, np.ndarray))
         return self._spark_predict(SparkLinearRegression, X)
+
+    def to_scikit(self):
+        return self._to_scikit(LinearRegression)

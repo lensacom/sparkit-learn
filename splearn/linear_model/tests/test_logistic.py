@@ -14,5 +14,7 @@ class TestLogisticRegression(SplearnTestCase):
 
         local.fit(X, y)
         dist.fit(Z, classes=np.unique(y))
+        converted = dist.to_scikit()
 
         assert_array_almost_equal(local.coef_, dist.coef_, decimal=1)
+        assert_array_almost_equal(local.coef_, converted.coef_, decimal=1)

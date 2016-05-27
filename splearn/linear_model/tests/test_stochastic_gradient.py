@@ -18,9 +18,15 @@ class TestSGDClassifier(SplearnTestCase):
 
         y_local = local.predict(X)
         y_dist = dist.predict(Z[:, 'X'])
+        y_converted = dist.to_scikit().predict(X)
 
         mismatch = y_local.shape[0] - np.count_nonzero(y_dist.toarray() == y_local)
         mismatch_percent = float(mismatch) * 100 / y_local.shape[0]
 
         assert_true(mismatch_percent <= 1)
         assert_true(check_rdd_dtype(y_dist, (np.ndarray,)))
+
+        mismatch = y_local.shape[0] - np.count_nonzero(y_converted == y_local)
+        mismatch_percent = float(mismatch) * 100 / y_local.shape[0]
+
+        assert_true(mismatch_percent <= 1)

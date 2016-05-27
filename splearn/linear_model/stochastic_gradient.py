@@ -186,3 +186,8 @@ class SparkSGDClassifier(SGDClassifier, SparkLinearModelMixin):
         """
         check_rdd(X, (sp.spmatrix, np.ndarray))
         return self._spark_predict(SparkSGDClassifier, X)
+
+    def to_scikit(self):
+        obj = self._to_scikit(SGDClassifier)
+        obj.classes_ = self.classes_
+        return obj

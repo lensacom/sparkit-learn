@@ -74,6 +74,11 @@ class SparkBaseNB(BaseNB, SparkClassifierMixin):
         return X.map(
             lambda X: super(SparkBaseNB, self).predict_log_proba(X))
 
+    def _to_scikit(self, cls):
+        new = cls()
+        new.__dict__ = self.__dict__
+        return new
+
 
 class SparkGaussianNB(GaussianNB, SparkBaseNB):
 
@@ -154,6 +159,9 @@ class SparkGaussianNB(GaussianNB, SparkBaseNB):
         this.class_prior_[:] = this.class_count_ / np.sum(this.class_count_)
         return this
 
+    def to_scikit(self):
+        return self._to_scikit(GaussianNB)
+
 
 class SparkBaseDiscreteNB(BaseDiscreteNB, SparkBaseNB):
 
@@ -223,8 +231,10 @@ class SparkBaseDiscreteNB(BaseDiscreteNB, SparkBaseNB):
 
 
 class SparkMultinomialNB(MultinomialNB, SparkBaseDiscreteNB):
-    pass
+    def to_scikit(self):
+        return self._to_scikit(MultinomialNB)
 
 
 class SparkBernoulliNB(BernoulliNB, SparkBaseDiscreteNB):
-    pass
+    def to_scikit(self):
+        return self._to_scikit(BernoulliNB)
