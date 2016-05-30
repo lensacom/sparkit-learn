@@ -242,20 +242,7 @@ class SparkFeatureUnion(FeatureUnion):
             hstack of results of transformers. sum_n_components is the
             sum of n_components (output dimension) over transformers.
         """
-        result = Parallel(n_jobs=self.n_jobs, backend="threading")(
-            delayed(_fit_transform_one)(trans, name, Z,
-                                        self.transformer_weights, **fit_params)
-            for name, trans in self.transformer_list)
-
-        Zs, transformers = list(zip(*result))
-        self._update_transformer_list(transformers)
-
-        X = reduce(lambda x, y: x.zip(y._rdd), Zs)
-        for item in X.first():
-            if sp.issparse(item):
-                return X.map(lambda x: sp.hstack(x))
-        X = X.map(lambda x: np.hstack(x))
-        return X
+        return self.fit(Z).transform(Z)
 
     def transform(self, Z):
         """TODO: rewrite docstring
@@ -270,13 +257,27 @@ class SparkFeatureUnion(FeatureUnion):
             hstack of results of transformers. sum_n_components is the
             sum of n_components (output dimension) over transformers.
         """
-        Zs = [_transform_one(trans, name, Z, self.transformer_weights)
+        if isinstance(Z, DictRDD):
+            X = Z[:, 'X']
+        else:
+            X = Z
+
+        Zs = [_transform_one(trans, name, X, self.transformer_weights)
               for name, trans in self.transformer_list]
-        X = reduce(lambda x, y: x.zip(y._rdd), Zs)
-        for item in X.first():
+        X_rdd = reduce(lambda x, y: x.zip(y._rdd), Zs)
+        mapper = np.hstack
+        for item in X_rdd.first():
             if sp.issparse(item):
-                return X.map(lambda x: sp.hstack(x))
-        return X.map(lambda x: np.hstack(x))
+                mapper = sp.hstack
+        X_rdd = X_rdd.map(lambda x: mapper(x))
+
+        if isinstance(Z, DictRDD):
+            return DictRDD([X_rdd, Z[:, 'y']],
+                           columns=Z.columns,
+                           dtype=Z.dtype,
+                           bsize=Z.bsize)
+        else:
+            return X_rdd
 
     def get_params(self, deep=True):
         if not deep:
