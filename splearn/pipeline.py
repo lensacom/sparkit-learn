@@ -195,6 +195,16 @@ def _fit_transform_one(transformer, name, Z, transformer_weights,
         return Z_transformed, transformer
 
 
+def flatten(l):
+    out = []
+    for item in l:
+        if isinstance(item, (list, tuple)):
+            out.extend(flatten(item))
+        else:
+            out.append(item)
+    return out
+
+
 class SparkFeatureUnion(FeatureUnion):
 
     """TODO: rewrite docstring
@@ -265,6 +275,7 @@ class SparkFeatureUnion(FeatureUnion):
         Zs = [_transform_one(trans, name, X, self.transformer_weights)
               for name, trans in self.transformer_list]
         X_rdd = reduce(lambda x, y: x.zip(y._rdd), Zs)
+        X_rdd = X_rdd.map(flatten)
         mapper = np.hstack
         for item in X_rdd.first():
             if sp.issparse(item):

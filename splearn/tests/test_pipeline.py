@@ -89,15 +89,19 @@ class TestFeatureUnion(SplearnTestCase):
         dist_char = SparkCountVectorizer(analyzer="char_wb", ngram_range=(3, 3))
 
         loc_word = CountVectorizer(analyzer="word")
+        loc_word_2 = CountVectorizer(analyzer="word")
         dist_word = SparkCountVectorizer(analyzer="word")
+        dist_word_2 = SparkCountVectorizer(analyzer="word")
 
         loc_union = FeatureUnion([
             ("chars", loc_char),
-            ("words", loc_word)
+            ("words", loc_word),
+            ("words2", loc_word_2)
         ])
         dist_union = SparkFeatureUnion([
             ("chars", dist_char),
-            ("words", dist_word)
+            ("words", dist_word),
+            ("words2", dist_word_2)
         ])
         # test same feature names
         loc_union.fit(X)
