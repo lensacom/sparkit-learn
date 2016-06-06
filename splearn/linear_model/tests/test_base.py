@@ -16,9 +16,12 @@ class TestLinearRegression(SplearnTestCase):
 
         local.fit(X, y)
         dist.fit(Z)
+        converted = dist.to_scikit()
 
         assert_array_almost_equal(local.coef_, dist.coef_)
         assert_array_almost_equal(local.intercept_, dist.intercept_)
+        assert_array_almost_equal(local.coef_, converted.coef_)
+        assert_array_almost_equal(local.intercept_, converted.intercept_)
 
     def test_same_prediction(self):
         X, y, Z = self.make_regression(1, 100000)
@@ -28,6 +31,8 @@ class TestLinearRegression(SplearnTestCase):
 
         y_local = local.fit(X, y).predict(X)
         y_dist = dist.fit(Z).predict(Z[:, 'X'])
+        y_converted = dist.to_scikit().predict(X)
 
         assert_true(check_rdd_dtype(y_dist, (np.ndarray,)))
         assert_array_almost_equal(y_local, y_dist.toarray())
+        assert_array_almost_equal(y_local, y_converted)

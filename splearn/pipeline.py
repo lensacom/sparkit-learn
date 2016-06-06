@@ -141,6 +141,15 @@ class SparkPipeline(Pipeline):
             out.update(super(SparkPipeline, self).get_params(deep=False))
             return out
 
+    def to_scikit(self):
+        scikit_steps = []
+        for name, step in self.steps:
+            if hasattr(step, 'to_scikit'):
+                scikit_steps.append((name, step.to_scikit()))
+            else:
+                scikit_steps.append((name, step))
+        return Pipeline(scikit_steps)
+
 ################################################################################
 
 
@@ -276,6 +285,15 @@ class SparkFeatureUnion(FeatureUnion):
                     out['%s__%s' % (name, key)] = value
             out.update(super(SparkFeatureUnion, self).get_params(deep=False))
             return out
+
+    def to_scikit(self):
+        sk_transformer_list = []
+        for name, transformer in self.transformer_list:
+            if hasattr(transformer, 'to_scikit'):
+                sk_transformer_list.append((name, transformer.to_scikit()))
+            else:
+                sk_transformer_list.append((name, transformer))
+        return FeatureUnion(sk_transformer_list)
 
 
 def make_sparkunion(*transformers):

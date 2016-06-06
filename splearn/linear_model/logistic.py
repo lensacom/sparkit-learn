@@ -151,3 +151,6 @@ class SparkLogisticRegression(LogisticRegression, SparkLinearModelMixin):
         """
         check_rdd(X, (sp.spmatrix, np.ndarray))
         return self._spark_predict(SparkLogisticRegression, X)
+
+    def to_scikit(self):
+        return self._to_scikit(LogisticRegression)

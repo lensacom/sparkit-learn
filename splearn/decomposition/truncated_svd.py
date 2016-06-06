@@ -348,3 +348,8 @@ class SparkTruncatedSVD(TruncatedSVD, SparkBroadcasterMixin):
         mapper = self.broadcast(
             super(SparkTruncatedSVD, self).inverse_transform, Z.context)
         return Z.transform(mapper, column='X', dtype=np.ndarray)
+
+    def to_scikit(self):
+        svd = TruncatedSVD()
+        svd.__dict__ = self.__dict__
+        return svd
