@@ -15,3 +15,4 @@ export PYTHONPATH=$PYTHONPATH:$PYFORJ
 export PYTHONWARNINGS="ignore"
 
 nosetests $@ --verbosity 2 --rednose --nologcapture
+
