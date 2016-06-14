@@ -83,15 +83,16 @@ class SparkPipeline(Pipeline):
         for pname, pval in six.iteritems(fit_params):
             step, param = pname.split('__', 1)
             fit_params_steps[step][param] = pval
-        Zt = Z.persist()
+        Zp = Z.persist()
         for name, transform in self.steps[:-1]:
             if hasattr(transform, "fit_transform"):
-                Zt = transform.fit_transform(Zt, **fit_params_steps[name])
+                Zt = transform.fit_transform(Zp, **fit_params_steps[name])
             else:
-                Zt = transform.fit(Zt, **fit_params_steps[name]) \
-                              .transform(Zt)
-            Zt = Zt.persist()
-        return Zt, fit_params_steps[self.steps[-1][0]]
+                Zt = transform.fit(Zp, **fit_params_steps[name]) \
+                              .transform(Zp)
+            Zp.unpersist()
+            Zp = Zt.persist()
+        return Zp, fit_params_steps[self.steps[-1][0]]
 
     def fit(self, Z, **fit_params):
         """Fit all the transforms one after the other and transform the
@@ -108,6 +109,7 @@ class SparkPipeline(Pipeline):
         """
         Zt, fit_params = self._pre_transform(Z, **fit_params)
         self.steps[-1][-1].fit(Zt, **fit_params)
+        Zt.unpersist()
         return self
 
     def fit_transform(self, Z, **fit_params):
@@ -193,6 +195,16 @@ def _fit_transform_one(transformer, name, Z, transformer_weights,
         return Z_transformed, transformer
 
 
+def flatten(l):
+    out = []
+    for item in l:
+        if isinstance(item, (list, tuple)):
+            out.extend(flatten(item))
+        else:
+            out.append(item)
+    return out
+
+
 class SparkFeatureUnion(FeatureUnion):
 
     """TODO: rewrite docstring
@@ -240,19 +252,7 @@ class SparkFeatureUnion(FeatureUnion):
             hstack of results of transformers. sum_n_components is the
             sum of n_components (output dimension) over transformers.
         """
-        result = Parallel(n_jobs=self.n_jobs, backend="threading")(
-            delayed(_fit_transform_one)(trans, name, Z,
-                                        self.transformer_weights, **fit_params)
-            for name, trans in self.transformer_list)
-
-        Zs, transformers = list(zip(*result))
-        self._update_transformer_list(transformers)
-
-        X = reduce(lambda x, y: x.zip(y._rdd), Zs)
-        for item in X.first():
-            if sp.issparse(item):
-                return X.map(lambda x: sp.hstack(x))
-        X = X.map(lambda x: np.hstack(x))
+        return self.fit(Z).transform(Z)
 
     def transform(self, Z):
         """TODO: rewrite docstring
@@ -267,13 +267,28 @@ class SparkFeatureUnion(FeatureUnion):
             hstack of results of transformers. sum_n_components is the
             sum of n_components (output dimension) over transformers.
         """
-        Zs = [_transform_one(trans, name, Z, self.transformer_weights)
+        if isinstance(Z, DictRDD):
+            X = Z[:, 'X']
+        else:
+            X = Z
+
+        Zs = [_transform_one(trans, name, X, self.transformer_weights)
               for name, trans in self.transformer_list]
-        X = reduce(lambda x, y: x.zip(y._rdd), Zs)
-        for item in X.first():
+        X_rdd = reduce(lambda x, y: x.zip(y._rdd), Zs)
+        X_rdd = X_rdd.map(flatten)
+        mapper = np.hstack
+        for item in X_rdd.first():
             if sp.issparse(item):
-                return X.map(lambda x: sp.hstack(x))
-        return X.map(lambda x: np.hstack(x))
+                mapper = sp.hstack
+        X_rdd = X_rdd.map(lambda x: mapper(x))
+
+        if isinstance(Z, DictRDD):
+            return DictRDD([X_rdd, Z[:, 'y']],
+                           columns=Z.columns,
+                           dtype=Z.dtype,
+                           bsize=Z.bsize)
+        else:
+            return X_rdd
 
     def get_params(self, deep=True):
         if not deep:

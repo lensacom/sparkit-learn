@@ -7,6 +7,8 @@ from sklearn.linear_model.logistic import LogisticRegression
 from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.utils.testing import (assert_array_equal, assert_equal,
                                    assert_false, assert_raises, assert_true)
+
+from splearn import DictRDD, ArrayRDD
 from splearn.decomposition import SparkTruncatedSVD
 from splearn.feature_extraction.text import SparkCountVectorizer
 from splearn.feature_selection import SparkVarianceThreshold
@@ -77,6 +79,72 @@ class FitParamT(object):
 
 
 class TestFeatureUnion(SplearnTestCase):
+
+    def test_same_result_withdictrdd(self):
+        X, X_rdd = self.make_text_rdd(2)
+        Y_rdd = ArrayRDD(self.sc.parallelize([None] * len(X), 4), bsize=2)
+        Z = DictRDD([X_rdd, Y_rdd], columns=("X", "y"), bsize=2)
+
+        loc_char = CountVectorizer(analyzer="char_wb", ngram_range=(3, 3))
+        dist_char = SparkCountVectorizer(analyzer="char_wb", ngram_range=(3, 3))
+
+        loc_word = CountVectorizer(analyzer="word")
+        loc_word_2 = CountVectorizer(analyzer="word")
+        dist_word = SparkCountVectorizer(analyzer="word")
+        dist_word_2 = SparkCountVectorizer(analyzer="word")
+
+        loc_union = FeatureUnion([
+            ("chars", loc_char),
+            ("words", loc_word),
+            ("words2", loc_word_2)
+        ])
+        dist_union = SparkFeatureUnion([
+            ("chars", dist_char),
+            ("words", dist_word),
+            ("words2", dist_word_2)
+        ])
+        # test same feature names
+        loc_union.fit(X)
+        dist_union.fit(Z)
+        converted_union = dist_union.to_scikit()
+
+        assert_equal(
+            loc_union.get_feature_names(),
+            dist_union.get_feature_names(),
+            converted_union.get_feature_names(),
+        )
+
+        # test same results
+        Z_transformed = sp.vstack(dist_union.transform(Z)[:, 'X'].collect())
+        assert_array_equal(loc_union.transform(X).toarray(), Z_transformed.toarray())
+        assert_array_equal(loc_union.transform(X).toarray(),
+                           converted_union.transform(X).toarray())
+        # test same results with fit_transform
+        X_transformed = loc_union.fit_transform(X)
+        X_converted_transformed = converted_union.fit_transform(X)
+        Z_transformed = sp.vstack(dist_union.fit_transform(Z)[:, 'X'].collect())
+
+        assert_array_equal(X_transformed.toarray(), Z_transformed.toarray())
+        assert_array_equal(X_transformed.toarray(),
+                           X_converted_transformed.toarray())
+        # test same results in parallel
+        loc_union_par = FeatureUnion([
+            ("chars", loc_char),
+            ("words", loc_word)
+        ], n_jobs=2)
+        dist_union_par = SparkFeatureUnion([
+            ("chars", dist_char),
+            ("words", dist_word)
+        ], n_jobs=2)
+
+        loc_union_par.fit(X)
+        dist_union_par.fit(Z)
+        converted_union = dist_union_par.to_scikit()
+        X_transformed = loc_union_par.transform(X)
+        Z_transformed = sp.vstack(dist_union_par.transform(Z)[:, 'X'].collect())
+        assert_array_equal(X_transformed.toarray(), Z_transformed.toarray())
+        assert_array_equal(X_transformed.toarray(),
+                           converted_union.transform(X).toarray())
 
     def test_same_result(self):
         X, Z = self.make_text_rdd(2)

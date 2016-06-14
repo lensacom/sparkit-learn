@@ -5,14 +5,6 @@ import sys
 from setuptools import find_packages, setup
 
 
-def is_numpy_installed():
-    try:
-        import numpy
-    except ImportError:
-        return False
-    return True
-
-
 def setup_package():
     metadata = dict(
         name='sparkit-learn',
@@ -26,15 +18,6 @@ def setup_package():
         long_description=open('./README.rst').read(),
         install_requires=open('./requirements.txt').read().split()
     )
-    if not (len(sys.argv) >= 2
-            and ('--help' in sys.argv[1:] or sys.argv[1]
-                 in ('--help-commands', 'egg_info', '--version', 'clean'))):
-        if is_numpy_installed() is False:
-            raise ImportError("Numerical Python (NumPy) is not installed.\n"
-                              "sparkit-learn requires NumPy.\n"
-                              "Installation instructions are available on "
-                              "scikit-learn website: "
-                              "http://scikit-learn.org/stable/install.html\n")
 
     setup(**metadata)
 

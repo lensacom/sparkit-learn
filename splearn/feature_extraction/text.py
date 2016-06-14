@@ -300,8 +300,7 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
         # transform according to vocabulary
         mapper = self.broadcast(self._count_vocab, A.context)
         Z = A.transform(mapper, column='X', dtype=sp.spmatrix)
-        Z = Z.persist()
-        A.unpersist()
+
 
         if not self.fixed_vocabulary_:
             X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
@@ -331,7 +330,7 @@ class SparkCountVectorizer(CountVectorizer, SparkBroadcasterMixin):
             mask = kept_indices[map_index]
 
             Z = Z.transform(lambda x: x[:, mask], column='X', dtype=sp.spmatrix)
-
+        A.unpersist()
         return Z
 
     def transform(self, Z):
