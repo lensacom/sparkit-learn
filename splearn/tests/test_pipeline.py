@@ -45,7 +45,8 @@ class IncorrectT(object):
 
 class T(IncorrectT):
 
-    def fit(self, Z):
+    def fit(self, Z, **fit_params):
+        self.fit_params = fit_params
         return self
 
     def get_params(self, deep=False):
@@ -226,6 +227,34 @@ class TestFeatureUnion(SplearnTestCase):
         names, transformers = list(zip(*fu.transformer_list))
         assert_equal(names, ("sparktruncatedsvd", "transft"))
         assert_equal(transformers, (svd, mock))
+
+    def test_params_are_forwarded(self):
+        transformer1 = T()
+        transformer2 = T()
+        pipe = SparkFeatureUnion([('t1', transformer1),
+                                  ('t2', transformer2)])
+
+        print(pipe.get_params(deep=True))
+        expected = dict(t1__a=None, t1__b=None,
+                        t2__a=None, t2__b=None,
+                        t1=transformer1, t2=transformer2,
+                        **pipe.get_params(deep=False)
+                                  )
+        print(expected)
+        assert_equal(pipe.get_params(deep=True), expected)
+
+        # Check that params are set
+        pipe.set_params(t1__a=0.1)
+        assert_equal(transformer1.a, 0.1)
+        assert_equal(transformer1.b, None)
+        assert_equal(transformer2.a, None)
+        assert_equal(transformer2.b, None)
+
+        # Check that params are set
+        _, _, Z = self.make_classification(2, 10000, 2000)
+        pipe.fit(Z, t1__a=0.2, t2__a=0.3)
+        assert_equal(transformer1.fit_params, {'a': 0.2})
+        assert_equal(transformer2.fit_params, {'a': 0.3})
 
 
 class TestPipeline(SplearnTestCase):
