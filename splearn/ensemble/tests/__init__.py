@@ -19,5 +19,5 @@ class TestSparkRandomForest(SplearnTestCase):
         y_conv = dist.to_scikit().predict(X)
 
         assert_true(check_rdd_dtype(y_dist, (np.ndarray,)))
-        assert(sum(y_local != y_dist.toarray()) < len(y_local) * 2./100.)
-        assert(sum(y_local != y_conv) < len(y_local) * 2./100.)
+        assert(sum(y_local != y_dist.toarray()) < len(y_local) * 5./100.)
+        assert(sum(y_local != y_conv) < len(y_local) * 5./100.)

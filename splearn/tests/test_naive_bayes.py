@@ -40,3 +40,11 @@ class TestMultinomialNB(SplearnTestCase):
         assert_true(check_rdd_dtype(y_dist, (np.ndarray,)))
         assert_array_almost_equal(y_local, y_dist.toarray())
         assert_array_almost_equal(y_local, y_converted)
+
+        y_proba_local = local.fit(X, y).predict_proba(X)
+        y_proba_dist = dist.fit(Z, classes=np.unique(y)).predict_proba(Z[:, 'X'])
+        y_proba_converted = dist.to_scikit().predict_proba(X)
+
+        assert_true(check_rdd_dtype(y_dist, (np.ndarray,)))
+        assert_array_almost_equal(y_proba_local, y_proba_dist.toarray(), 5)
+        assert_array_almost_equal(y_proba_local, y_proba_converted, 5)

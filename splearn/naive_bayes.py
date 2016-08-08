@@ -7,6 +7,8 @@ import scipy.sparse as sp
 from sklearn.base import copy
 from sklearn.naive_bayes import (BaseDiscreteNB, BaseNB, BernoulliNB,
                                  GaussianNB, MultinomialNB)
+
+from splearn import BlockRDD
 from splearn.base import SparkClassifierMixin
 from splearn.utils.validation import check_rdd
 
@@ -70,6 +72,12 @@ class SparkBaseNB(BaseNB, SparkClassifierMixin):
             the model for each RDD block. The columns correspond to the classes
             in sorted order, as they appear in the attribute `classes_`.
         """
+        # required, scikit call self.predict_log_proba(X) in predict_proba
+        # and thus this function is call, it must have the same behavior when
+        # not called by sparkit-learn
+        if not isinstance(X, BlockRDD):
+            return super(SparkBaseNB, self).predict_log_proba(X)
+
         check_rdd(X, (sp.spmatrix, np.ndarray))
         return X.map(
             lambda X: super(SparkBaseNB, self).predict_log_proba(X))
