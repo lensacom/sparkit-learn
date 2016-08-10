@@ -224,7 +224,7 @@ class SparkFeatureUnion(FeatureUnion):
         Keys are transformer names, values the weights.
     """
 
-    def fit(self, Z):
+    def fit(self, Z, **fit_params):
         """TODO: rewrite docstring
         Fit all transformers using X.
         Parameters
@@ -232,8 +232,15 @@ class SparkFeatureUnion(FeatureUnion):
         X : array-like or sparse matrix, shape (n_samples, n_features)
             Input data, used to fit transformers.
         """
+        fit_params_steps = dict((step, {})
+                                for step, _ in self.transformer_list)
+
+        for pname, pval in six.iteritems(fit_params):
+            step, param = pname.split('__', 1)
+            fit_params_steps[step][param] = pval
+
         transformers = Parallel(n_jobs=self.n_jobs, backend="threading")(
-            delayed(_fit_one_transformer)(trans, Z)
+            delayed(_fit_one_transformer)(trans, Z, **fit_params_steps[name])
             for name, trans in self.transformer_list)
         self._update_transformer_list(transformers)
         return self
@@ -252,7 +259,7 @@ class SparkFeatureUnion(FeatureUnion):
             hstack of results of transformers. sum_n_components is the
             sum of n_components (output dimension) over transformers.
         """
-        return self.fit(Z).transform(Z)
+        return self.fit(Z, **fit_params).transform(Z)
 
     def transform(self, Z):
         """TODO: rewrite docstring
