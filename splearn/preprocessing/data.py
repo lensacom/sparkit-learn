@@ -111,13 +111,7 @@ class SparkStandardScaler(StandardScaler, SparkTransformerMixin):
                 raise ValueError(
                     "Cannot center sparse matrices: pass `with_mean=False` "
                     "instead. See docstring for motivation and alternatives.")
-            if self.with_std:
-                _, _, self.var_ = X.map(mapper).treeReduce(reducer)
-            else:
-                self.mean_ = None
-                self.var_ = None
-        else:
-            _, self.mean_, self.var_ = X.map(mapper).treeReduce(reducer)
+        self.n_samples_seen_, self.mean_, self.var_ = X.map(mapper).treeReduce(reducer)
 
         if self.with_std:
             self.scale_ = _handle_zeros_in_scale(np.sqrt(self.var_))
