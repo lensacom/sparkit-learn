@@ -46,6 +46,7 @@ class SparkStandardScaler(StandardScaler, SparkTransformerMixin):
         If True, scale the data to unit variance (or equivalently,
         unit standard deviation).
     copy : boolean, optional, default True
+        Ignored in Spark, used when converted to scikit
         If False, try to avoid a copy and do inplace scaling instead.
         This is not guaranteed to always work inplace; e.g. if the data is
         not a NumPy array or scipy.sparse CSR matrix, a copy may still be
@@ -76,10 +77,13 @@ class SparkStandardScaler(StandardScaler, SparkTransformerMixin):
         """Compute the mean and std to be used for later scaling.
         Parameters
         ----------
-        X : {array-like, sparse matrix}, shape [n_samples, n_features]
-            The data used to compute the mean and standard deviation
-            used for later scaling along the features axis.
-        y: Passthrough for ``Pipeline`` compatibility.
+        Z : DictRDD containing (X, y) pairs
+            X - Training vector.
+                {array-like, sparse matrix}, shape [n_samples, n_features]
+                The data used to compute the mean and standard deviation
+                used for later scaling along the features axis.
+            y - Target labels
+                Passthrough for ``Pipeline`` compatibility.
         """
 
         # Reset internal state before fitting
@@ -124,8 +128,14 @@ class SparkStandardScaler(StandardScaler, SparkTransformerMixin):
         """Perform standardization by centering and scaling
         Parameters
         ----------
-        X : array-like, shape [n_samples, n_features]
-            The data used to scale along the features axis.
+        Z : DictRDD containing (X, y) pairs
+            X - Training vector
+            y - Target labels
+        Returns
+        -------
+        C : DictRDD containing (X, y) pairs
+            X - Training vector standardized
+            y - Target labels
         """
         X = Z[:, 'X'] if isinstance(Z, DictRDD) else Z
         check_rdd(X, (np.ndarray, sp.spmatrix))
@@ -160,6 +170,9 @@ class SparkStandardScaler(StandardScaler, SparkTransformerMixin):
         return Z.transform(mapper, column="X")
 
     def to_scikit(self):
+        """
+        Convert to equivalent StandardScaler
+        """
         scaler = StandardScaler(with_mean=self.with_mean,
                                 with_std=self.with_std,
                                 copy=self.copy)
