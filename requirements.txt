@@ -1,5 +1,6 @@
 argparse
 nose
+rednose
 numpy
 scikit-learn>=0.16.1
 scipy
