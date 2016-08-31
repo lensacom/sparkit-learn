@@ -153,4 +153,6 @@ class SparkLogisticRegression(LogisticRegression, SparkLinearModelMixin):
         return self._spark_predict(SparkLogisticRegression, X)
 
     def to_scikit(self):
-        return self._to_scikit(LogisticRegression)
+        m = self._to_scikit(LogisticRegression)
+        m.classes_ = self._classes_
+        return m
