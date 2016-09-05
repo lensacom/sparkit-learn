@@ -11,6 +11,8 @@ env:
     - SPARK_VERSION="1.5.2" PYTHON_VERSION="3.4"
     - SPARK_VERSION="1.6.0" PYTHON_VERSION="2.7"
     - SPARK_VERSION="1.6.0" PYTHON_VERSION="3.4"
+    - SPARK_VERSION="2.0.0" PYTHON_VERSION="2.7"
+    - SPARK_VERSION="2.0.0" PYTHON_VERSION="3.4"
 
 before_install:
   - sudo apt-get update
@@ -18,6 +20,8 @@ before_install:
       wget http://d3kbcqa49mib13.cloudfront.net/spark-1.6.0-bin-hadoop2.6.tgz;
     elif [[ "$SPARK_VERSION" == "1.5.2" ]]; then
       wget http://d3kbcqa49mib13.cloudfront.net/spark-1.5.2-bin-hadoop2.6.tgz;
+    elif [[ "$SPARK_VERSION" == "2.0.0" ]]; then
+      wget http://d3kbcqa49mib13.cloudfront.net/spark-2.0.0-bin-hadoop2.6.tgz;
     else
       wget http://d3kbcqa49mib13.cloudfront.net/spark-1.4.1-bin-hadoop2.6.tgz;
     fi
