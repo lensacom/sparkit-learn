@@ -465,6 +465,6 @@ Similar Projects
 .. |Gitter| image:: https://badges.gitter.im/Join%20Chat.svg
    :alt: Join the chat at https://gitter.im/lensacom/sparkit-learn
    :target: https://gitter.im/lensacom/sparkit-learn?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
-.. |Gitential| image:: https://api.gitential.com:8006/accounts/6/projects/75/badges/13
+.. |Gitential| image:: https://api.gitential.com/accounts/6/projects/75/badges/coding-hours.svg
    :alt: Gitential Coding Hours
    :target: https://gitential.com/accounts/6/projects/75/share?uuid=095e15c5-46b9-4534-a1d4-3b0bf1f33100&utm_source=shield&utm_medium=shield&utm_campaign=75
