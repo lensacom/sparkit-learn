@@ -38,7 +38,7 @@ before_install:
   - conda info -a
 
 install:
-  - conda create --yes -q -n test-environment python=$PYTHON_VERSION nose numpy
+  - conda create --yes -q -n test-environment python=$PYTHON_VERSION nose numpy=1.11.3 nomkl
     scipy scikit-learn
   - source activate test-environment
   - pip install -r requirements.txt
