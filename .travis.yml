@@ -39,7 +39,7 @@ before_install:
 
 install:
   - conda create --yes -q -n test-environment python=$PYTHON_VERSION nose numpy=1.11.3 nomkl
-    scipy scikit-learn
+    scipy scikit-learn=0.18.1
   - source activate test-environment
   - pip install -r requirements.txt
   - pip install rednose
